@@ -102,9 +102,6 @@ jobs:
           GITHUB_CLIENT_ID: "test-github-client-id"
           GITHUB_CLIENT_SECRET: "test-github-client-secret"
         run: |
-          # Run Django migrations for test database
-          python manage.py migrate --settings=config.test_settings
-
           # Verify the setup worked
           python manage.py check --settings=config.test_settings
 
