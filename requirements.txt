@@ -13,7 +13,7 @@ colorama==0.4.6
 coverage==7.10.5
 dj-database-url==3.0.1
 Django==5.2.5
-django-cors-headers==4.7.0
+django-cors-headers==4.8.0
 django-extensions==4.1
 django-ratelimit==4.1.0
 django-redis==6.0.0
