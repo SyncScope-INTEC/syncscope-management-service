@@ -1,0 +1,64 @@
+name: Delete Merged Branch
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  delete-merged-branch:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    
+    steps:
+      - name: Delete merged branch
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branchName = context.payload.pull_request.head.ref;
+            const repoOwner = context.repo.owner;
+            const repoName = context.repo.repo;
+            
+            // Don't delete protected branches
+            const protectedBranches = ['main', 'master', 'prod', 'production', 'develop', 'dev'];
+            
+            if (protectedBranches.includes(branchName.toLowerCase())) {
+              console.log(`Skipping deletion of protected branch: ${branchName}`);
+              return;
+            }
+            
+            // Don't delete branches from forks
+            if (context.payload.pull_request.head.repo.full_name !== context.payload.pull_request.base.repo.full_name) {
+              console.log(`Skipping deletion of fork branch: ${branchName}`);
+              return;
+            }
+            
+            try {
+              await github.rest.git.deleteRef({
+                owner: repoOwner,
+                repo: repoName,
+                ref: `heads/${branchName}`
+              });
+              console.log(`Successfully deleted branch: ${branchName}`);
+              
+              // Add comment to PR
+              await github.rest.issues.createComment({
+                owner: repoOwner,
+                repo: repoName,
+                issue_number: context.payload.pull_request.number,
+                body: `🤖 Management Service - Automatically deleted branch \`${branchName}\` after merge.`
+              });
+              
+            } catch (error) {
+              console.error(`Failed to delete branch ${branchName}: ${error.message}`);
+              
+              // Don't fail the workflow if branch deletion fails
+              if (error.status === 422) {
+                console.log(`Branch ${branchName} may have already been deleted`);
+              }
+            }

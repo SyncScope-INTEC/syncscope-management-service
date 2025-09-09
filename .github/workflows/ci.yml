@@ -1,0 +1,425 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [dev, qa, prod]
+  pull_request:
+    branches: [dev, qa, prod]
+
+env:
+  PYTHON_VERSION: "3.11"
+
+# Add permissions for the workflow
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: test_syncscope
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          # Fetch more history for proper diff comparison
+          fetch-depth: 0
+
+      - name: Set up Git for diff coverage
+        if: github.event_name == 'pull_request'
+        run: |
+          # Set up git configuration
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Ensure we have the base branch for comparison
+          echo "Setting up base branch for comparison..."
+          BASE_BRANCH="${{ github.base_ref }}"
+          echo "Base branch: $BASE_BRANCH"
+
+          # Fetch the base branch
+          git fetch origin "$BASE_BRANCH:$BASE_BRANCH" || echo "Branch $BASE_BRANCH already exists"
+
+          # List available branches for debugging
+          echo "Available branches:"
+          git branch -a
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Set up test environment
+        env:
+          SECRET_KEY: "test-secret-key-for-ci"
+          DEBUG: "True"
+          DB_NAME: "test_syncscope"
+          DB_USER: "postgres"
+          DB_PASSWORD: "postgres"
+          DB_HOST: "localhost"
+          DB_PORT: "5432"
+          REDIS_URL: "redis://localhost:6379/0"
+          JWT_SECRET_KEY: "test-jwt-secret"
+          ALLOWED_HOSTS: "localhost,127.0.0.1"
+          CORS_ALLOWED_ORIGINS: "http://localhost:3000"
+          AUTH_SERVICE_URL: "http://localhost:8001"
+          MONITORING_SERVICE_URL: "http://localhost:8002"
+          ANALYTICS_SERVICE_URL: "http://localhost:8004"
+          API_GATEWAY_URL: "http://localhost:8000"
+          FRONTEND_URL: "http://localhost:3000"
+          GITHUB_CLIENT_ID: "test-github-client-id"
+          GITHUB_CLIENT_SECRET: "test-github-client-secret"
+        run: |
+          # Run Django migrations for test database
+          python manage.py migrate --settings=config.test_settings
+
+          # Verify the setup worked
+          python manage.py check --settings=config.test_settings
+
+      - name: Run linting
+        run: |
+          # Check code formatting
+          black --check --diff .
+
+          # Check import sorting
+          isort --check-only --diff .
+
+      - name: Get changed files (PR only)
+        if: github.event_name == 'pull_request'
+        id: changed-files
+        uses: tj-actions/changed-files@v46
+        with:
+          files: |
+            **/*.py
+          files_ignore: |
+            migrations/**
+            tests/**
+            manage.py
+            __pycache__/**
+
+      - name: Debug git setup (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "=== Git Debug Information ==="
+          echo "Current HEAD: $(git rev-parse HEAD)"
+          echo "Current branch: $(git branch --show-current)"
+          echo "Base ref: ${{ github.base_ref }}"
+          echo "Head ref: ${{ github.head_ref }}"
+          echo ""
+          echo "Available branches:"
+          git branch -a
+          echo ""
+          echo "Recent commits:"
+          git log --oneline -5
+          echo "=========================="
+
+      - name: Run tests with differential coverage (PR)
+        if: github.event_name == 'pull_request'
+        env:
+          SECRET_KEY: "test-secret-key-for-ci"
+          DEBUG: "True"
+          DB_NAME: "test_syncscope"
+          DB_USER: "postgres"
+          DB_PASSWORD: "postgres"
+          DB_HOST: "localhost"
+          DB_PORT: "5432"
+          REDIS_URL: "redis://localhost:6379/0"
+          JWT_SECRET_KEY: "test-jwt-secret"
+          ALLOWED_HOSTS: "localhost,127.0.0.1"
+          CORS_ALLOWED_ORIGINS: "http://localhost:3000"
+          AUTH_SERVICE_URL: "http://localhost:8001"
+          MONITORING_SERVICE_URL: "http://localhost:8002"
+          ANALYTICS_SERVICE_URL: "http://localhost:8004"
+          API_GATEWAY_URL: "http://localhost:8000"
+          FRONTEND_URL: "http://localhost:3000"
+          GITHUB_CLIENT_ID: "test-github-client-id"
+          GITHUB_CLIENT_SECRET: "test-github-client-secret"
+        run: |
+          # Install diff-cover for differential coverage
+          pip install diff-cover
+
+          # Run all tests with coverage report generation
+          coverage run -m pytest tests/ --ds=config.test_settings
+
+          # Generate both XML and text coverage reports
+          coverage xml
+          coverage report > coverage-report.txt
+
+          # Generate differential coverage report only for changed files
+          if [ "${{ steps.changed-files.outputs.any_changed }}" == "true" ]; then
+            echo "🔍 Changed Python files:"
+            echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n' | sed 's/^/  📄 /'
+            echo ""
+            
+            # Get the base branch for comparison
+            BASE_BRANCH="${{ github.base_ref }}"
+            echo "📊 Comparing against base branch: $BASE_BRANCH"
+            echo ""
+            
+            # Create a temporary file to capture diff-cover output
+            DIFF_COVER_OUTPUT="/tmp/diff_cover_output.txt"
+            DIFF_COVER_STATUS=0
+            
+            # Try different comparison strategies
+            if git rev-parse "$BASE_BRANCH" >/dev/null 2>&1; then
+              echo "✅ Using local branch: $BASE_BRANCH"
+              diff-cover coverage.xml --compare-branch="$BASE_BRANCH" --fail-under=80 --show-uncovered > "$DIFF_COVER_OUTPUT" 2>&1 || DIFF_COVER_STATUS=$?
+            elif git rev-parse "origin/$BASE_BRANCH" >/dev/null 2>&1; then
+              echo "✅ Using origin branch: origin/$BASE_BRANCH"
+              diff-cover coverage.xml --compare-branch="origin/$BASE_BRANCH" --fail-under=80 --show-uncovered > "$DIFF_COVER_OUTPUT" 2>&1 || DIFF_COVER_STATUS=$?
+            else
+              echo "⚠️ Could not find base branch for comparison. Using HEAD~1 as fallback."
+              diff-cover coverage.xml --compare-branch="HEAD~1" --fail-under=80 --show-uncovered > "$DIFF_COVER_OUTPUT" 2>&1 || DIFF_COVER_STATUS=$?
+            fi
+            
+            # Set status for later steps
+            if [ $DIFF_COVER_STATUS -eq 0 ]; then
+              echo "✅ Differential coverage check PASSED (≥80% threshold met)"
+              echo "diff_coverage_status=passed" >> $GITHUB_ENV
+            else
+              echo "❌ Differential coverage check FAILED (below 80% threshold)"
+              echo "diff_coverage_status=failed" >> $GITHUB_ENV
+            fi
+            
+            # Store the diff-cover output for use in PR comments
+            echo "DIFF_COVER_OUTPUT<<EOF" >> $GITHUB_ENV
+            cat "$DIFF_COVER_OUTPUT" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+            
+          else
+            echo "ℹ️  No Python files changed, skipping differential coverage"
+            echo "diff_coverage_status=skipped" >> $GITHUB_ENV
+          fi
+
+      - name: Run tests with full coverage (Push to main)
+        if: github.event_name == 'push'
+        env:
+          SECRET_KEY: "test-secret-key-for-ci"
+          DEBUG: "True"
+          DB_NAME: "test_syncscope"
+          DB_USER: "postgres"
+          DB_PASSWORD: "postgres"
+          DB_HOST: "localhost"
+          DB_PORT: "5432"
+          REDIS_URL: "redis://localhost:6379/0"
+          JWT_SECRET_KEY: "test-jwt-secret"
+          ALLOWED_HOSTS: "localhost,127.0.0.1"
+          CORS_ALLOWED_ORIGINS: "http://localhost:3000"
+          AUTH_SERVICE_URL: "http://localhost:8001"
+          MONITORING_SERVICE_URL: "http://localhost:8002"
+          ANALYTICS_SERVICE_URL: "http://localhost:8004"
+          API_GATEWAY_URL: "http://localhost:8000"
+          FRONTEND_URL: "http://localhost:3000"
+          GITHUB_CLIENT_ID: "test-github-client-id"
+          GITHUB_CLIENT_SECRET: "test-github-client-secret"
+        run: |
+          # Run tests with full coverage
+          coverage run -m pytest tests/ --ds=config.test_settings
+          coverage report
+          coverage xml
+
+      - name: Check coverage threshold
+        id: coverage_check
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # For PRs, check if coverage files were generated
+            if [ -f "coverage.xml" ] && [ -f "coverage-report.txt" ]; then
+              COVERAGE=$(coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
+              echo "Overall coverage: ${COVERAGE}%"
+              echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
+              echo "type=differential" >> $GITHUB_OUTPUT
+              
+              # Check differential coverage status
+              DIFF_STATUS="$diff_coverage_status"
+              if [ "$DIFF_STATUS" = "passed" ]; then
+                echo "status=passed" >> $GITHUB_OUTPUT
+                echo "✅ Differential coverage check completed - all modified files meet 80% threshold"
+              elif [ "$DIFF_STATUS" = "failed" ]; then
+                echo "status=failed" >> $GITHUB_OUTPUT
+                echo "❌ Differential coverage check failed - some modified files below 80% threshold"
+                exit 1
+              else
+                echo "status=passed" >> $GITHUB_OUTPUT
+                echo "✅ No Python files changed, differential coverage not required"
+              fi
+            else
+              echo "coverage=N/A" >> $GITHUB_OUTPUT
+              echo "status=passed" >> $GITHUB_OUTPUT
+              echo "type=differential" >> $GITHUB_OUTPUT
+              echo "✅ No Python files changed, differential coverage not required"
+            fi
+          else
+            # For pushes to main, check full coverage
+            COVERAGE=$(coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
+            echo "Full coverage: ${COVERAGE}%"
+            echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
+            echo "type=full" >> $GITHUB_OUTPUT
+
+            if ! python -c "import sys; sys.exit(0 if float('${COVERAGE}') >= 80 else 1)"; then
+              echo "❌ Coverage is ${COVERAGE}%, which is below the required 80% threshold"
+              echo "Please add more tests to improve coverage"
+              echo "status=failed" >> $GITHUB_OUTPUT
+              exit 1
+            else
+              echo "✅ Coverage is ${COVERAGE}%, which meets the 80% threshold"
+              echo "status=passed" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Comment coverage report on PR
+        if: github.event_name == 'pull_request'
+        uses: MishaKav/pytest-coverage-comment@main
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pytest-coverage-path: ./coverage-report.txt
+          pytest-xml-coverage-path: ./coverage.xml
+          title: "🧪 Management Service - Differential Coverage Report"
+          badge-title: "Coverage"
+          report-only-changed-files: true
+          hide-comment: false
+          default-branch: ${{ github.base_ref }}
+          remove-links-to-files: false
+          remove-links-to-lines: false
+
+      - name: Add coverage to job summary
+        if: always()
+        run: |
+          COVERAGE="${{ steps.coverage_check.outputs.coverage }}"
+          STATUS="${{ steps.coverage_check.outputs.status }}"
+          TYPE="${{ steps.coverage_check.outputs.type }}"
+          IS_CHANGED="${{ steps.changed-files.outputs.any_changed }}"
+
+          if [ "$STATUS" = "passed" ]; then
+            EMOJI="✅"
+            STATUS_TEXT="PASSED"
+          else
+            EMOJI="❌"
+            STATUS_TEXT="FAILED"
+          fi
+
+          if [ "$TYPE" = "differential" ]; then
+            if [ "$IS_CHANGED" = "true" ]; then
+              echo "## ${EMOJI} Management Service - Differential Coverage Report - ${STATUS_TEXT}" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**🎯 Coverage Check**: Only modified files checked for 80% threshold" >> $GITHUB_STEP_SUMMARY
+              echo "**📊 Overall Project Coverage**: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              if [ "$STATUS" = "passed" ]; then
+                echo "✅ All modified files meet the 80% coverage requirement" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "❌ Some modified files are below the 80% coverage requirement" >> $GITHUB_STEP_SUMMARY
+              fi
+            else
+              echo "## ✅ Management Service - Coverage Report - PASSED" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**🎯 Coverage Check**: No Python files were modified" >> $GITHUB_STEP_SUMMARY
+              echo "**📊 Overall Project Coverage**: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "✅ No coverage check required as no Python source files were changed" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "## ${EMOJI} Management Service - Full Coverage Report - ${STATUS_TEXT}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**📊 Full Project Coverage**: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            if [ "$STATUS" = "passed" ]; then
+              echo "✅ Meets the 80% threshold requirement" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ Below the 80% threshold requirement" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "<details>" >> $GITHUB_STEP_SUMMARY
+          echo "<summary>📊 Detailed Coverage Report</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          if coverage report > /dev/null 2>&1; then
+            coverage report >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Coverage report not available" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+
+      - name: Security check
+        continue-on-error: true
+        run: |
+          # Install security tools
+          pip install safety bandit
+
+          # Check for known security vulnerabilities
+          safety scan --json || safety check --json || echo "Security scan completed with warnings"
+
+          # Run bandit security linter
+          bandit -r . -x tests/ -f json || echo "Bandit scan completed with warnings"
+
+      - name: Build check
+        env:
+          SECRET_KEY: "test-secret-key-for-ci"
+          DEBUG: "True"
+          DB_NAME: "test_syncscope"
+          DB_USER: "postgres"
+          DB_PASSWORD: "postgres"
+          DB_HOST: "localhost"
+          DB_PORT: "5432"
+          REDIS_URL: "redis://localhost:6379/0"
+          JWT_SECRET_KEY: "test-jwt-secret"
+          ALLOWED_HOSTS: "localhost,127.0.0.1"
+          CORS_ALLOWED_ORIGINS: "http://localhost:3000"
+          AUTH_SERVICE_URL: "http://localhost:8001"
+          MONITORING_SERVICE_URL: "http://localhost:8002"
+          ANALYTICS_SERVICE_URL: "http://localhost:8004"
+          API_GATEWAY_URL: "http://localhost:8000"
+          FRONTEND_URL: "http://localhost:3000"
+          GITHUB_CLIENT_ID: "test-github-client-id"
+          GITHUB_CLIENT_SECRET: "test-github-client-secret"
+        run: |
+          # Collect static files
+          python manage.py collectstatic --noinput --settings=config.test_settings
+
+          # Check if Django can start
+          python manage.py check --settings=config.test_settings
+
+          # Generate OpenAPI schema
+          python manage.py spectacular --file schema.yml --settings=config.test_settings
+
+      - name: Upload schema artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: management-service-openapi-schema
+          path: schema.yml
