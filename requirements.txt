@@ -20,7 +20,7 @@ django-redis==6.0.0
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
 factory_boy==3.3.3
-Faker==37.5.3
+Faker==37.6.0
 gunicorn==23.0.0
 idna==3.10
 iniconfig==2.1.0
