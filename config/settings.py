@@ -182,10 +182,18 @@ STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Static files directories - only include if they exist
-STATICFILES_DIRS = []
+STATICFILES_DIRS = [
+    BASE_DIR / "apps" / "management" / "static",
+]
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Authentication backends for admin integration with auth service API
+AUTHENTICATION_BACKENDS = [
+    "apps.management.database_auth_backend.CachedAuthServiceAPIBackend",
+    "django.contrib.auth.backends.ModelBackend",  # Fallback for local users
+]
 
 # REST Framework configuration
 REST_FRAMEWORK = {

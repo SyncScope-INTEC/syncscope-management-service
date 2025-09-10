@@ -1,163 +1,408 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ service_name }}</title>
+    <title>{{ api_title }}</title>
+    <link rel="icon" type="image/svg+xml" href="{% static 'management/images/syncscope-logo.svg' %}">
+    <link rel="alternate icon" href="{% static 'management/images/syncscope-logo.svg' %}">
     <style>
+        :root {
+            /* Light theme */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --text-muted: #888888;
+            --border-color: #e5e7eb;
+            --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            --accent-primary: #10b981;
+            --accent-secondary: #3b82f6;
+            --success-color: #10b981;
+            --hover-bg: #f3f4f6;
+        }
+        
+        [data-theme="dark"] {
+            /* Dark theme */
+            --bg-primary: #0f0f23;
+            --bg-secondary: #1a1a2e;
+            --text-primary: #ffffff;
+            --text-secondary: #d1d5db;
+            --text-muted: #9ca3af;
+            --border-color: #374151;
+            --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            --accent-primary: #10b981;
+            --accent-secondary: #3b82f6;
+            --success-color: #10b981;
+            --hover-bg: #374151;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 2rem;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             line-height: 1.6;
-            color: #333;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
+        
+        /* Header */
         .header {
-            text-align: center;
-            border-bottom: 2px solid #007bff;
-            padding-bottom: 1rem;
-            margin-bottom: 2rem;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
         }
-        .service-info {
-            background: #f8f9fa;
-            padding: 1.5rem;
-            border-radius: 8px;
-            margin-bottom: 2rem;
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
-        .endpoints {
-            margin-bottom: 2rem;
+        
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
-        .endpoint {
-            background: white;
-            border: 1px solid #e9ecef;
-            padding: 1rem;
-            margin: 0.5rem 0;
-            border-radius: 4px;
+        
+        .logo-svg {
+            width: 40px;
+            height: 40px;
+            transition: transform 0.3s ease;
         }
-        .method {
-            display: inline-block;
-            padding: 0.25rem 0.5rem;
-            border-radius: 3px;
-            font-weight: bold;
-            font-size: 0.8rem;
-            margin-right: 0.5rem;
+        
+        .logo-svg:hover {
+            transform: scale(1.05);
         }
-        .get { background: #28a745; color: white; }
-        .post { background: #007bff; color: white; }
-        .put { background: #ffc107; color: black; }
-        .delete { background: #dc3545; color: white; }
-        .code {
-            font-family: 'Monaco', 'Consolas', monospace;
-            background: #f8f9fa;
-            padding: 0.2rem 0.4rem;
-            border-radius: 3px;
+        
+        .brand-text {
+            display: flex;
+            flex-direction: column;
         }
-        .docs-link {
-            text-align: center;
-            margin-top: 2rem;
+        
+        .brand-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
         }
-        .docs-link a {
-            display: inline-block;
-            background: #007bff;
+        
+        .brand-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+        
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .version-badge {
+            background: var(--accent-primary);
             color: white;
-            padding: 0.8rem 1.5rem;
-            text-decoration: none;
-            border-radius: 4px;
-            margin: 0 0.5rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
         }
-        .docs-link a:hover {
-            background: #0056b3;
+        
+        .theme-toggle {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .theme-toggle:hover {
+            background: var(--hover-bg);
+            transform: translateY(-1px);
+        }
+        
+        .theme-icon {
+            font-size: 1.2rem;
+            transition: transform 0.3s ease;
+        }
+        
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        
+        /* Service Overview */
+        .service-intro {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        
+        .service-description {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        /* Quick Access */
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+        }
+        
+        .routes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 3rem;
+        }
+        
+        .route-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        
+        .route-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--card-shadow);
+            border-color: var(--accent-primary);
+            text-decoration: none;
+            color: inherit;
+        }
+        
+        .route-icon {
+            font-size: 1.5rem;
+            width: 48px;
+            height: 48px;
+            background: var(--accent-primary);
+            color: white;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .route-content {
+            flex: 1;
+        }
+        
+        .route-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .route-description {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        
+        /* Service Features */
+        .features-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+        }
+        
+        .features-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+        
+        .feature-tag {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .feature-tag.management-feature {
+            background: var(--accent-primary);
+            color: white;
+            border-color: transparent;
+        }
+        
+        .feature-tag:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header-content {
+                padding: 0 1rem;
+            }
+            
+            .container {
+                padding: 1.5rem 1rem;
+            }
+            
+            .brand-text {
+                display: none;
+            }
+            
+            .routes-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .route-card {
+                flex-direction: column;
+                text-align: center;
+                gap: 1rem;
+            }
+            
+            .route-icon {
+                align-self: center;
+            }
+        }
+        
+        /* Animations */
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
     </style>
 </head>
-<body>
+<body data-theme="light">
     <div class="header">
-        <h1>{{ service_name }}</h1>
-        <p>Version {{ version }}</p>
+        <div class="header-content">
+            <div class="logo-section">
+                <img src="{% static 'management/images/syncscope-logo.svg' %}" class="logo-svg" alt="SyncScope Logo">
+                
+                <div class="brand-text">
+                    <div class="brand-title">{{ api_title }}</div>
+                    <div class="brand-subtitle">Team & Project Hub</div>
+                </div>
+            </div>
+            
+            <div class="header-controls">
+                <div class="version-badge">v{{ api_version }}</div>
+                <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+                    <span class="theme-icon">🌙</span>
+                </button>
+            </div>
+        </div>
     </div>
-
-    <div class="service-info">
-        <h2>Service Information</h2>
-        <p><strong>Description:</strong> {{ description }}</p>
-        <p><strong>Status:</strong> <span style="color: #28a745;">✓ Active</span></p>
-    </div>
-
-    <div class="endpoints">
-        <h2>Available Endpoints</h2>
+    
+    <div class="container fade-in">
+        <div class="routes-section">
+            <h2 class="section-title">🚀 Quick Access</h2>
+            <div class="routes-grid">
+                {% for route in main_routes %}
+                <a href="{{ route.url }}" class="route-card" {% if route.category == 'admin' or route.category == 'documentation' %}target="_blank"{% endif %}>
+                    <div class="route-icon">{{ route.icon }}</div>
+                    <div class="route-content">
+                        <div class="route-title">{{ route.title }}</div>
+                        <div class="route-description">{{ route.description }}</div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
         
-        <div class="endpoint">
-            <span class="method get">GET</span>
-            <span class="code">/management/api/teams/</span>
-            <p>List all teams you have access to</p>
-        </div>
-
-        <div class="endpoint">
-            <span class="method post">POST</span>
-            <span class="code">/management/api/teams/</span>
-            <p>Create a new team</p>
-        </div>
-
-        <div class="endpoint">
-            <span class="method get">GET</span>
-            <span class="code">/management/api/teams/{id}/</span>
-            <p>Get detailed information about a specific team</p>
-        </div>
-
-        <div class="endpoint">
-            <span class="method get">GET</span>
-            <span class="code">/management/api/teams/{id}/members/</span>
-            <p>Get all members of a team</p>
-        </div>
-
-        <div class="endpoint">
-            <span class="method post">POST</span>
-            <span class="code">/management/api/teams/{id}/members/</span>
-            <p>Add a new member to a team</p>
-        </div>
-
-        <div class="endpoint">
-            <span class="method get">GET</span>
-            <span class="code">/management/api/teams/{id}/projects/</span>
-            <p>Get all projects belonging to a team</p>
-        </div>
-
-        <div class="endpoint">
-            <span class="method get">GET</span>
-            <span class="code">/management/api/projects/</span>
-            <p>List all projects you have access to</p>
-        </div>
-
-        <div class="endpoint">
-            <span class="method post">POST</span>
-            <span class="code">/management/api/projects/</span>
-            <p>Create a new project</p>
-        </div>
-
-        <div class="endpoint">
-            <span class="method get">GET</span>
-            <span class="code">/management/api/projects/{id}/integrations/</span>
-            <p>Get all integrations for a project</p>
-        </div>
-
-        <div class="endpoint">
-            <span class="method post">POST</span>
-            <span class="code">/management/api/projects/{id}/integrations/</span>
-            <p>Create a new integration for a project</p>
-        </div>
-
-        <div class="endpoint">
-            <span class="method get">GET</span>
-            <span class="code">/management/api/projects/{id}/commits/</span>
-            <p>Get recent commits for a project</p>
+        <div class="features-section">
+            <h2 class="section-title">⚡ Service Features</h2>
+            <div class="features-grid">
+                {% for feature in service_info.features %}
+                <span class="feature-tag">{{ feature }}</span>
+                {% endfor %}
+                {% for method in service_info.auth_methods %}
+                <span class="feature-tag management-feature">🔐 {{ method }}</span>
+                {% endfor %}
+            </div>
         </div>
     </div>
-
-    <div class="docs-link">
-        <h2>API Documentation</h2>
-        <a href="/api/docs/">Swagger UI</a>
-        <a href="/api/redoc/">ReDoc</a>
-        <a href="/api/schema/">OpenAPI Schema</a>
-    </div>
+    
+    <script>
+        // Theme toggle functionality
+        function toggleTheme() {
+            const body = document.body;
+            const themeIcon = document.querySelector('.theme-icon');
+            
+            if (body.getAttribute('data-theme') === 'light') {
+                body.setAttribute('data-theme', 'dark');
+                themeIcon.textContent = '☀️';
+                localStorage.setItem('theme', 'dark');
+            } else {
+                body.setAttribute('data-theme', 'light');
+                themeIcon.textContent = '🌙';
+                localStorage.setItem('theme', 'light');
+            }
+        }
+        
+        // Load saved theme
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            const body = document.body;
+            const themeIcon = document.querySelector('.theme-icon');
+            
+            body.setAttribute('data-theme', savedTheme);
+            themeIcon.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        }
+        
+        // Initialize theme on page load
+        document.addEventListener('DOMContentLoaded', loadTheme);
+        
+        // Add smooth hover effects
+        document.querySelectorAll('.route-card').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-2px)';
+            });
+            
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
+            });
+        });
+    </script>
 </body>
 </html>

@@ -7,7 +7,7 @@ paths:
   /:
     get:
       operationId: root_retrieve
-      description: API home page for the Management Service.
+      description: API Home page showing main navigation routes and service links.
       security:
       - Bearer: []
       - {}
@@ -17,6 +17,27 @@ paths:
   /health/:
     get:
       operationId: health_retrieve
+      description: Check if the service is alive (basic endpoint for load balancers).
+      summary: Liveness check endpoint
+      tags:
+      - Health
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: alive
+          description: ''
+  /health/detailed/:
+    get:
+      operationId: health_detailed_retrieve
       description: Check the health status of the service including database and cache
         connections.
       summary: Health check endpoint
@@ -120,16 +141,16 @@ paths:
   /management/:
     get:
       operationId: root_retrieve_2
-      description: API home page for the Management Service.
+      description: API Home page showing main navigation routes and service links.
       security:
       - Bearer: []
       - {}
       responses:
         '200':
           description: No response body
-  /management/api/commits/:
+  /management/commits/:
     get:
-      operationId: api_commits_list
+      operationId: commits_list
       description: Get a list of code commits the user has access to.
       summary: List code commits
       parameters:
@@ -150,9 +171,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedCodeCommitList'
           description: ''
-  /management/api/commits/{id}/:
+  /management/commits/{id}/:
     get:
-      operationId: api_commits_retrieve
+      operationId: commits_retrieve
       description: Get detailed information about a specific commit.
       summary: Get commit details
       parameters:
@@ -174,9 +195,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/CodeCommit'
           description: ''
-  /management/api/github-integrations/:
+  /management/github-integrations/:
     get:
-      operationId: api_github_integrations_list
+      operationId: github_integrations_list
       description: Get a list of all GitHub integrations the user has access to.
       summary: List GitHub integrations
       parameters:
@@ -198,7 +219,7 @@ paths:
                 $ref: '#/components/schemas/PaginatedGitHubIntegrationList'
           description: ''
     post:
-      operationId: api_github_integrations_create
+      operationId: github_integrations_create
       description: Create a new GitHub integration for a project.
       summary: Create GitHub integration
       tags:
@@ -224,9 +245,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/GitHubIntegration'
           description: ''
-  /management/api/github-integrations/{id}/:
+  /management/github-integrations/{id}/:
     get:
-      operationId: api_github_integrations_retrieve
+      operationId: github_integrations_retrieve
       description: Get detailed information about a specific GitHub integration.
       summary: Get GitHub integration details
       parameters:
@@ -249,7 +270,7 @@ paths:
                 $ref: '#/components/schemas/GitHubIntegration'
           description: ''
     put:
-      operationId: api_github_integrations_update
+      operationId: github_integrations_update
       description: Update GitHub integration configuration.
       summary: Update GitHub integration
       parameters:
@@ -284,7 +305,7 @@ paths:
                 $ref: '#/components/schemas/GitHubIntegration'
           description: ''
     patch:
-      operationId: api_github_integrations_partial_update
+      operationId: github_integrations_partial_update
       description: ViewSet for managing GitHub integrations.
       parameters:
       - in: path
@@ -295,7 +316,7 @@ paths:
         description: A UUID string identifying this git hub integration.
         required: true
       tags:
-      - api
+      - github-integrations
       requestBody:
         content:
           application/json:
@@ -317,7 +338,7 @@ paths:
                 $ref: '#/components/schemas/GitHubIntegration'
           description: ''
     delete:
-      operationId: api_github_integrations_destroy
+      operationId: github_integrations_destroy
       description: Delete a GitHub integration.
       summary: Delete GitHub integration
       parameters:
@@ -335,9 +356,9 @@ paths:
       responses:
         '204':
           description: No response body
-  /management/api/github-integrations/{id}/sync/:
+  /management/github-integrations/{id}/sync/:
     post:
-      operationId: api_github_integrations_sync_create
+      operationId: github_integrations_sync_create
       description: Trigger a manual sync for a GitHub integration.
       summary: Sync GitHub integration
       parameters:
@@ -371,9 +392,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/GitHubIntegration'
           description: ''
-  /management/api/integrations/:
+  /management/integrations/:
     get:
-      operationId: api_integrations_list
+      operationId: integrations_list
       description: Get a list of all integrations the user has access to.
       summary: List integrations
       parameters:
@@ -395,7 +416,7 @@ paths:
                 $ref: '#/components/schemas/PaginatedIntegrationList'
           description: ''
     post:
-      operationId: api_integrations_create
+      operationId: integrations_create
       description: Create a new integration for a project.
       summary: Create integration
       tags:
@@ -421,9 +442,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/IntegrationCreate'
           description: ''
-  /management/api/integrations/{id}/:
+  /management/integrations/{id}/:
     get:
-      operationId: api_integrations_retrieve
+      operationId: integrations_retrieve
       description: Get detailed information about a specific integration.
       summary: Get integration details
       parameters:
@@ -446,7 +467,7 @@ paths:
                 $ref: '#/components/schemas/Integration'
           description: ''
     put:
-      operationId: api_integrations_update
+      operationId: integrations_update
       description: Update integration configuration.
       summary: Update integration
       parameters:
@@ -481,7 +502,7 @@ paths:
                 $ref: '#/components/schemas/Integration'
           description: ''
     patch:
-      operationId: api_integrations_partial_update
+      operationId: integrations_partial_update
       description: ViewSet for managing integrations.
       parameters:
       - in: path
@@ -492,7 +513,7 @@ paths:
         description: A UUID string identifying this integration.
         required: true
       tags:
-      - api
+      - integrations
       requestBody:
         content:
           application/json:
@@ -514,7 +535,7 @@ paths:
                 $ref: '#/components/schemas/Integration'
           description: ''
     delete:
-      operationId: api_integrations_destroy
+      operationId: integrations_destroy
       description: Delete an integration.
       summary: Delete integration
       parameters:
@@ -532,9 +553,9 @@ paths:
       responses:
         '204':
           description: No response body
-  /management/api/projects/:
+  /management/projects/:
     get:
-      operationId: api_projects_list
+      operationId: projects_list
       description: Get a list of projects the user has access to.
       summary: List projects
       parameters:
@@ -556,7 +577,7 @@ paths:
                 $ref: '#/components/schemas/PaginatedProjectList'
           description: ''
     post:
-      operationId: api_projects_create
+      operationId: projects_create
       description: Create a new project.
       summary: Create project
       tags:
@@ -582,9 +603,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProjectCreate'
           description: ''
-  /management/api/projects/{id}/:
+  /management/projects/{id}/:
     get:
-      operationId: api_projects_retrieve
+      operationId: projects_retrieve
       description: Get detailed information about a specific project.
       summary: Get project details
       parameters:
@@ -607,7 +628,7 @@ paths:
                 $ref: '#/components/schemas/ProjectDetail'
           description: ''
     put:
-      operationId: api_projects_update
+      operationId: projects_update
       description: Update project information.
       summary: Update project
       parameters:
@@ -642,7 +663,7 @@ paths:
                 $ref: '#/components/schemas/Project'
           description: ''
     patch:
-      operationId: api_projects_partial_update
+      operationId: projects_partial_update
       description: ViewSet for managing projects.
       parameters:
       - in: path
@@ -653,7 +674,7 @@ paths:
         description: A UUID string identifying this project.
         required: true
       tags:
-      - api
+      - projects
       requestBody:
         content:
           application/json:
@@ -675,7 +696,7 @@ paths:
                 $ref: '#/components/schemas/Project'
           description: ''
     delete:
-      operationId: api_projects_destroy
+      operationId: projects_destroy
       description: Delete a project and all its associated data.
       summary: Delete project
       parameters:
@@ -693,9 +714,9 @@ paths:
       responses:
         '204':
           description: No response body
-  /management/api/projects/{id}/commits/:
+  /management/projects/{id}/commits/:
     get:
-      operationId: api_projects_commits_retrieve
+      operationId: projects_commits_retrieve
       description: Get recent commits for a specific project.
       summary: Get project commits
       parameters:
@@ -717,9 +738,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Project'
           description: ''
-  /management/api/projects/{id}/integrations/:
+  /management/projects/{id}/integrations/:
     get:
-      operationId: api_projects_integrations_retrieve
+      operationId: projects_integrations_retrieve
       description: Get all integrations for a specific project.
       summary: Get project integrations
       parameters:
@@ -742,7 +763,7 @@ paths:
                 $ref: '#/components/schemas/Project'
           description: ''
     post:
-      operationId: api_projects_integrations_create
+      operationId: projects_integrations_create
       description: Get all integrations for a specific project.
       summary: Get project integrations
       parameters:
@@ -776,9 +797,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Project'
           description: ''
-  /management/api/team-members/:
+  /management/team-members/:
     get:
-      operationId: api_team_members_list
+      operationId: team_members_list
       description: Get a list of all team members the user has access to.
       summary: List team members
       parameters:
@@ -800,7 +821,7 @@ paths:
                 $ref: '#/components/schemas/PaginatedTeamMemberList'
           description: ''
     post:
-      operationId: api_team_members_create
+      operationId: team_members_create
       description: Add a new member to a team.
       summary: Add team member
       tags:
@@ -826,9 +847,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/TeamMember'
           description: ''
-  /management/api/team-members/{id}/:
+  /management/team-members/{id}/:
     get:
-      operationId: api_team_members_retrieve
+      operationId: team_members_retrieve
       description: Get detailed information about a specific team member.
       summary: Get team member details
       parameters:
@@ -851,7 +872,7 @@ paths:
                 $ref: '#/components/schemas/TeamMember'
           description: ''
     put:
-      operationId: api_team_members_update
+      operationId: team_members_update
       description: Update team member role or information.
       summary: Update team member
       parameters:
@@ -886,7 +907,7 @@ paths:
                 $ref: '#/components/schemas/TeamMember'
           description: ''
     patch:
-      operationId: api_team_members_partial_update
+      operationId: team_members_partial_update
       description: ViewSet for managing team members.
       parameters:
       - in: path
@@ -897,7 +918,7 @@ paths:
         description: A UUID string identifying this team member.
         required: true
       tags:
-      - api
+      - team-members
       requestBody:
         content:
           application/json:
@@ -919,7 +940,7 @@ paths:
                 $ref: '#/components/schemas/TeamMember'
           description: ''
     delete:
-      operationId: api_team_members_destroy
+      operationId: team_members_destroy
       description: Remove a member from a team.
       summary: Remove team member
       parameters:
@@ -937,9 +958,9 @@ paths:
       responses:
         '204':
           description: No response body
-  /management/api/teams/:
+  /management/teams/:
     get:
-      operationId: api_teams_list
+      operationId: teams_list
       description: Get a list of teams for the authenticated user's company.
       summary: List teams
       parameters:
@@ -961,7 +982,7 @@ paths:
                 $ref: '#/components/schemas/PaginatedTeamList'
           description: ''
     post:
-      operationId: api_teams_create
+      operationId: teams_create
       description: Create a new team.
       summary: Create team
       tags:
@@ -987,9 +1008,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/TeamCreate'
           description: ''
-  /management/api/teams/{id}/:
+  /management/teams/{id}/:
     get:
-      operationId: api_teams_retrieve
+      operationId: teams_retrieve
       description: Get detailed information about a specific team.
       summary: Get team details
       parameters:
@@ -1012,7 +1033,7 @@ paths:
                 $ref: '#/components/schemas/TeamDetail'
           description: ''
     put:
-      operationId: api_teams_update
+      operationId: teams_update
       description: Update team information.
       summary: Update team
       parameters:
@@ -1046,7 +1067,7 @@ paths:
                 $ref: '#/components/schemas/TeamUpdate'
           description: ''
     patch:
-      operationId: api_teams_partial_update
+      operationId: teams_partial_update
       description: ViewSet for managing teams.
       parameters:
       - in: path
@@ -1057,7 +1078,7 @@ paths:
         description: A UUID string identifying this team.
         required: true
       tags:
-      - api
+      - teams
       requestBody:
         content:
           application/json:
@@ -1079,7 +1100,7 @@ paths:
                 $ref: '#/components/schemas/TeamUpdate'
           description: ''
     delete:
-      operationId: api_teams_destroy
+      operationId: teams_destroy
       description: Delete a team and all its associated data.
       summary: Delete team
       parameters:
@@ -1097,9 +1118,9 @@ paths:
       responses:
         '204':
           description: No response body
-  /management/api/teams/{id}/members/:
+  /management/teams/{id}/members/:
     get:
-      operationId: api_teams_members_retrieve
+      operationId: teams_members_retrieve
       description: Get all members of a specific team.
       summary: Get team members
       parameters:
@@ -1122,7 +1143,7 @@ paths:
                 $ref: '#/components/schemas/Team'
           description: ''
     post:
-      operationId: api_teams_members_create
+      operationId: teams_members_create
       description: Get all members of a specific team.
       summary: Get team members
       parameters:
@@ -1156,9 +1177,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Team'
           description: ''
-  /management/api/teams/{id}/projects/:
+  /management/teams/{id}/projects/:
     get:
-      operationId: api_teams_projects_retrieve
+      operationId: teams_projects_retrieve
       description: Get all projects belonging to a specific team.
       summary: Get team projects
       parameters:
@@ -1216,19 +1237,16 @@ components:
           format: date-time
         files_changed:
           type: integer
-          maximum: 9223372036854775807
-          minimum: -9223372036854775808
-          format: int64
+          maximum: 2147483647
+          minimum: -2147483648
         insertions:
           type: integer
-          maximum: 9223372036854775807
-          minimum: -9223372036854775808
-          format: int64
+          maximum: 2147483647
+          minimum: -2147483648
         deletions:
           type: integer
-          maximum: 9223372036854775807
-          minimum: -9223372036854775808
-          format: int64
+          maximum: 2147483647
+          minimum: -2147483648
         net_changes:
           type: string
           readOnly: true

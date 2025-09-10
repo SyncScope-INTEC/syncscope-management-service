@@ -48,15 +48,75 @@ from .serializers import (
 @permission_classes([permissions.AllowAny])
 def api_home(request):
     """
-    API home page for the Management Service.
+    API Home page showing main navigation routes and service links.
     """
-    template = loader.get_template("management/api_home.html")
-    context = {
-        "service_name": "SyncScope Management Service",
-        "version": "1.0.0",
-        "description": "Team and project management service for SyncScope platform",
+    # Define the main navigation routes
+    main_routes = [
+        {
+            "title": "API Documentation",
+            "description": "Interactive API documentation with live testing",
+            "url": request.build_absolute_uri("/api/docs/"),
+            "icon": "📖",
+            "category": "documentation",
+        },
+        {
+            "title": "ReDoc Documentation",
+            "description": "Clean, three-panel OpenAPI documentation",
+            "url": request.build_absolute_uri("/api/redoc/"),
+            "icon": "📚",
+            "category": "documentation",
+        },
+        {
+            "title": "OpenAPI Schema",
+            "description": "Raw OpenAPI specification in JSON format",
+            "url": request.build_absolute_uri("/api/schema/"),
+            "icon": "⚙️",
+            "category": "documentation",
+        },
+        {
+            "title": "Admin Interface",
+            "description": "Django admin panel for team and project management",
+            "url": request.build_absolute_uri("/admin/"),
+            "icon": "🔧",
+            "category": "admin",
+        },
+        {
+            "title": "Health Check",
+            "description": "Service health status and monitoring",
+            "url": request.build_absolute_uri("/health/"),
+            "icon": "❤️",
+            "category": "monitoring",
+        },
+    ]
+
+    # Quick stats about the service
+    service_info = {
+        "endpoints": 25,
+        "auth_methods": ["JWT", "Service Token"],
+        "features": ["Team Management", "Project Tracking", "GitHub Integration", "Member Roles", "Code Metrics"],
+        "status": "Operational",
     }
-    return HttpResponse(template.render(context, request))
+
+    context = {
+        "main_routes": main_routes,
+        "service_info": service_info,
+        "api_title": "SyncScope Management Service",
+        "api_version": "1.0.0",
+        "api_description": "Team and project management service for SyncScope platform",
+        "base_url": request.build_absolute_uri("/"),
+    }
+
+    # Check if JSON format is explicitly requested
+    if request.GET.get("format") == "json":
+        return Response(context, status=status.HTTP_200_OK)
+
+    # Try to render HTML template first, fallback to JSON
+    try:
+        template = loader.get_template("management/api_home.html")
+        return HttpResponse(template.render(context, request))
+    except Exception as e:
+        # Fallback to JSON response if template doesn't exist
+        return Response(context, status=status.HTTP_200_OK)
 
 
 @extend_schema_view(

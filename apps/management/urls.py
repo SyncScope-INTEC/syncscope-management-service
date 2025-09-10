@@ -28,5 +28,5 @@ app_name = "management"
 
 urlpatterns = [
     path("", api_home, name="api_home"),
-    path("api/", include(router.urls)),
+    path("", include(router.urls)),
 ]
