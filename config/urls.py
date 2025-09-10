@@ -20,7 +20,8 @@ urlpatterns = [
     path("", api_home, name="api_home"),
     path("admin/", admin.site.urls),
     # Health check endpoints
-    path("health/", health_check, name="health_check"),
+    path("health/", liveness_check, name="health_check"),  # Use simple liveness check for Railway
+    path("health/detailed/", health_check, name="detailed_health_check"),
     path("health/ready/", readiness_check, name="readiness_check"),
     path("health/live/", liveness_check, name="liveness_check"),
     # Management endpoints
