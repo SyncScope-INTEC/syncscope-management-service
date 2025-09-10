@@ -35,20 +35,34 @@ class TeamSerializer(serializers.ModelSerializer):
         if not attrs.get("created_by") and self.context.get("request"):
             user = self.context["request"].user
             if hasattr(user, "id") and user.id:
-                attrs["created_by"] = user.id
+                # Ensure it's a UUID, not a string
+                import uuid
+
+                if isinstance(user.id, str):
+                    attrs["created_by"] = uuid.UUID(user.id)
+                else:
+                    attrs["created_by"] = user.id
 
         # Set company_id from authenticated user if not provided
         if not attrs.get("company_id") and self.context.get("request"):
             user = self.context["request"].user
             if hasattr(user, "company_id") and user.company_id:
-                attrs["company_id"] = user.company_id
+                # Ensure it's a UUID, not a string
+                import uuid
+
+                if isinstance(user.company_id, str):
+                    attrs["company_id"] = uuid.UUID(user.company_id)
+                else:
+                    attrs["company_id"] = user.company_id
 
         # For tests without context, provide default values
         if not self.context.get("request"):
+            import uuid
+
             if not attrs.get("created_by"):
-                attrs["created_by"] = "550e8400-e29b-41d4-a716-446655440000"  # Test user ID
+                attrs["created_by"] = uuid.UUID("550e8400-e29b-41d4-a716-446655440000")  # Test user ID
             if not attrs.get("company_id"):
-                attrs["company_id"] = "550e8400-e29b-41d4-a716-446655440001"  # Test company ID
+                attrs["company_id"] = uuid.UUID("550e8400-e29b-41d4-a716-446655440001")  # Test company ID
 
         return attrs
 
@@ -334,6 +348,13 @@ class TeamUpdateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255, required=False, help_text="Team name")
     description = serializers.CharField(required=False, allow_blank=True, help_text="Team description")
 
+    def update(self, instance, validated_data):
+        """Update team instance with validated data."""
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        instance.save()
+        return instance
+
 
 class ProjectCreateSerializer(serializers.Serializer):
     """Serializer for project creation requests."""
@@ -362,6 +383,30 @@ class IntegrationCreateSerializer(serializers.Serializer):
     project_id = serializers.UUIDField(help_text="Project ID")
     type = serializers.ChoiceField(choices=Integration.INTEGRATION_TYPE_CHOICES, help_text="Integration type")
     config_data = serializers.JSONField(help_text="Integration configuration data")
+
+    def create(self, validated_data):
+        """Create integration instance from validated data."""
+        project_id = validated_data.pop("project_id")
+        project = Project.objects.get(id=project_id)
+        return Integration.objects.create(project=project, **validated_data)
+
+    def validate_config_data(self, value):
+        """Validate config data based on integration type."""
+        integration_type = self.initial_data.get("type")
+
+        if integration_type == "github":
+            required_fields = ["repository_owner", "repository_name"]
+            for field in required_fields:
+                if field not in value:
+                    raise serializers.ValidationError(f"GitHub integration requires '{field}' in config_data.")
+
+        elif integration_type == "slack":
+            required_fields = ["webhook_url"]
+            for field in required_fields:
+                if field not in value:
+                    raise serializers.ValidationError(f"Slack integration requires '{field}' in config_data.")
+
+        return value
 
 
 class ErrorResponseSerializer(serializers.Serializer):

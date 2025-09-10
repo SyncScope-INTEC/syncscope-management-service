@@ -27,7 +27,7 @@ class IsOwnerOrAdmin(permissions.BasePermission):
 
         # Check if user is the creator of the team
         if hasattr(user, "id") and hasattr(obj, "created_by"):
-            if user.id == obj.created_by:
+            if str(user.id) == str(obj.created_by):
                 return True
 
         # Check if user is a member of the team (for read operations)

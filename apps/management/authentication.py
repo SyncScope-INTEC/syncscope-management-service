@@ -73,6 +73,8 @@ class RemoteJWTAuthentication(BaseAuthentication):
                 return (user, token)
         except Exception as e:
             logger.warning(f"JWT authentication failed: {str(e)}")
+            if "Connection" in str(e) or "Service" in str(e) or "unavailable" in str(e).lower():
+                raise exceptions.AuthenticationFailed("Authentication service unavailable")
             raise exceptions.AuthenticationFailed("Invalid token")
 
         return None
@@ -136,7 +138,7 @@ class AuthServiceIntegration:
             if response.status_code == 200:
                 return response.json()
             return None
-        except requests.RequestException as e:
+        except Exception as e:
             logger.error(f"Failed to fetch user {user_id}: {str(e)}")
             return None
 

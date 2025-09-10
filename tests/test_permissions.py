@@ -109,6 +109,7 @@ class TestIsOwnerOrAdmin:
         permission = IsOwnerOrAdmin()
         assert permission.has_object_permission(request, None, team) is True
 
+    @pytest.mark.django_db
     def test_has_object_permission_no_access(self, team):
         """Test object permission for user with no access."""
         factory = APIRequestFactory()
@@ -214,6 +215,7 @@ class TestIsTeamMemberOrAdmin:
         permission = IsTeamMemberOrAdmin()
         assert permission.has_object_permission(request, None, team_member) is False
 
+    @pytest.mark.django_db
     def test_has_object_permission_no_access(self, team_member):
         """Test object permission for user with no access."""
         factory = APIRequestFactory()
@@ -334,6 +336,7 @@ class TestIsProjectMemberOrAdmin:
             # This is also acceptable behavior
             pass
 
+    @pytest.mark.django_db
     def test_has_object_permission_no_access(self, project):
         """Test object permission for user with no access."""
         factory = APIRequestFactory()

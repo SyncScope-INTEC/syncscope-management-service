@@ -194,6 +194,12 @@ class TestIntegrationAdmin:
             one_to_one = False
             remote_field = None
 
+            def formfield(self, **kwargs):
+                # Mock formfield method
+                from django import forms
+
+                return forms.CharField(**kwargs)
+
         field = MockField()
         result = admin.formfield_for_dbfield(field, None)
 

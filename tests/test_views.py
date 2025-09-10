@@ -511,7 +511,7 @@ class TestPermissions:
         url = reverse("management:team-detail", args=[team.id])
         response = authenticated_client.get(url)
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
