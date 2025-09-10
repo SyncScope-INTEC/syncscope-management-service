@@ -28,6 +28,10 @@ class TeamSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+        extra_kwargs = {
+            "company_id": {"required": False},
+            "created_by": {"required": False},
+        }
 
     def validate(self, attrs):
         """Validate team data."""
@@ -205,18 +209,20 @@ class TeamMemberSerializer(serializers.ModelSerializer):
         team = attrs.get("team")
         user_id = attrs.get("user_id")
 
-        # Check if user is already a member of the team
-        if TeamMember.objects.filter(team=team, user_id=user_id).exists():
-            raise serializers.ValidationError("User is already a member of this team.")
+        # Only run these validations for creation, not updates
+        if not self.instance:  # self.instance is None for creation, set for updates
+            # Check if user is already a member of the team
+            if team and user_id and TeamMember.objects.filter(team=team, user_id=user_id).exists():
+                raise serializers.ValidationError("User is already a member of this team.")
 
-        # Validate that the requesting user has permission to add members
-        if self.context.get("request"):
-            requesting_user = self.context["request"].user
-            if hasattr(requesting_user, "role") and requesting_user.role != "admin":
-                # Check if requesting user is a team lead
-                requesting_member = TeamMember.objects.filter(team=team, user_id=requesting_user.id, role="lead").first()
-                if not requesting_member:
-                    raise serializers.ValidationError("You don't have permission to add members to this team.")
+            # Validate that the requesting user has permission to add members
+            if self.context.get("request") and team:
+                requesting_user = self.context["request"].user
+                if hasattr(requesting_user, "role") and requesting_user.role != "admin":
+                    # Check if requesting user is a team lead
+                    requesting_member = TeamMember.objects.filter(team=team, user_id=requesting_user.id, role="lead").first()
+                    if not requesting_member:
+                        raise serializers.ValidationError("You don't have permission to add members to this team.")
 
         return attrs
 

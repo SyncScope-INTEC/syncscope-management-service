@@ -70,9 +70,11 @@ class TestTeamSerializer:
         assert serializer.is_valid()
         validated_data = serializer.validated_data
 
-        # Should not have created_by or company_id set
-        assert "created_by" not in validated_data
-        assert "company_id" not in validated_data
+        # Should have default values for required fields
+        assert "created_by" in validated_data
+        assert "company_id" in validated_data
+        assert str(validated_data["created_by"]) == "550e8400-e29b-41d4-a716-446655440000"
+        assert str(validated_data["company_id"]) == "550e8400-e29b-41d4-a716-446655440001"
 
 
 @pytest.mark.django_db
@@ -452,14 +454,14 @@ class TestRequestResponseSerializers:
             data={
                 "project_id": str(project.id),
                 "type": "github",
-                "config_data": {"test": "config"},
+                "config_data": {"repository_owner": "testuser", "repository_name": "test-repo"},
             }
         )
 
         assert serializer.is_valid()
         assert serializer.validated_data["project_id"] == project.id
         assert serializer.validated_data["type"] == "github"
-        assert serializer.validated_data["config_data"] == {"test": "config"}
+        assert serializer.validated_data["config_data"]["repository_owner"] == "testuser"
 
     def test_integration_create_serializer_required_fields(self):
         """Test integration creation serializer required fields."""

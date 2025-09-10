@@ -291,7 +291,10 @@ class ProjectViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
             return Response(serializer.data)
 
         elif request.method == "POST":
-            serializer = IntegrationCreateSerializer(data=request.data)
+            # Add project_id to the data for validation
+            data = request.data.copy()
+            data["project_id"] = project.id
+            serializer = IntegrationCreateSerializer(data=data)
             if serializer.is_valid():
                 Integration.objects.create(
                     project=project,
@@ -411,6 +414,12 @@ class IntegrationViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
 
     serializer_class = IntegrationSerializer
     permission_classes = [permissions.IsAuthenticated, IsProjectMemberOrAdmin]
+
+    def get_serializer_class(self):
+        """Return appropriate serializer class based on action."""
+        if self.action == "create":
+            return IntegrationCreateSerializer
+        return self.serializer_class
 
     def get_queryset(self):
         """Filter integrations by user access."""
