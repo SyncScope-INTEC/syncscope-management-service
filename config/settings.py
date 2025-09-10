@@ -176,17 +176,10 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"
-STATIC_ROOT = str(os.path.join(BASE_DIR, "staticfiles"))
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
-# Storage configuration (Django 4.2+)
-STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
-    },
-}
+# WhiteNoise configuration for static files serving
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Static files directories - only include if they exist
 STATICFILES_DIRS = []

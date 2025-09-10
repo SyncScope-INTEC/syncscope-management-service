@@ -3,6 +3,8 @@ Test-specific settings for pytest
 Uses SQLite in-memory database for faster, isolated testing
 """
 
+import os
+
 from .settings import *
 
 # Use SQLite for testing to avoid PostgreSQL connection issues
@@ -84,6 +86,6 @@ MAX_INTEGRATIONS_PER_PROJECT = 3
 GITHUB_SYNC_INTERVAL = 60
 DEFAULT_COMMIT_HISTORY_LIMIT = 10
 
-# Disable static files collection for tests
+# Configure static files for testing
 STATICFILES_DIRS = []
-STATIC_ROOT = None
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
