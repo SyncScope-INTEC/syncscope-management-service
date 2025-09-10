@@ -5,14 +5,8 @@ Django Admin configuration for Management models.
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import (
-    CodeCommit,
-    GitHubIntegration,
-    Integration,
-    Project,
-    Team,
-    TeamMember,
-)
+from .models import (CodeCommit, GitHubIntegration, Integration, Project, Team,
+                     TeamMember)
 
 
 class TeamMemberInline(admin.TabularInline):

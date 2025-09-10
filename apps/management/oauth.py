@@ -9,7 +9,8 @@ from rest_framework.response import Response
 
 from .models import Company, User
 from .serializers import UserProfileSerializer
-from .utils import create_user_session, extract_domain_from_email, get_tokens_for_user
+from .utils import (create_user_session, extract_domain_from_email,
+                    get_tokens_for_user)
 
 
 def exchange_code_for_token(code):

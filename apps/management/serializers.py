@@ -3,14 +3,8 @@ from rest_framework import serializers
 from config.database_retry import database_retry
 
 from .authentication import AuthServiceIntegration
-from .models import (
-    CodeCommit,
-    GitHubIntegration,
-    Integration,
-    Project,
-    Team,
-    TeamMember,
-)
+from .models import (CodeCommit, GitHubIntegration, Integration, Project, Team,
+                     TeamMember)
 
 
 class TeamSerializer(serializers.ModelSerializer):

@@ -6,14 +6,8 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.utils import timezone
 
-from apps.management.models import (
-    CodeCommit,
-    GitHubIntegration,
-    Integration,
-    Project,
-    Team,
-    TeamMember,
-)
+from apps.management.models import (CodeCommit, GitHubIntegration, Integration,
+                                    Project, Team, TeamMember)
 
 
 @pytest.mark.django_db

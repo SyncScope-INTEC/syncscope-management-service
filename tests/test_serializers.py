@@ -5,29 +5,20 @@ import pytest
 from rest_framework.test import APIRequestFactory
 
 from apps.management.authentication import RemoteUserProxy
-from apps.management.models import (
-    CodeCommit,
-    GitHubIntegration,
-    Integration,
-    Project,
-    Team,
-    TeamMember,
-)
-from apps.management.serializers import (
-    CodeCommitSerializer,
-    GitHubIntegrationSerializer,
-    IntegrationCreateSerializer,
-    IntegrationSerializer,
-    ProjectCreateSerializer,
-    ProjectDetailSerializer,
-    ProjectSerializer,
-    TeamCreateSerializer,
-    TeamDetailSerializer,
-    TeamMemberCreateSerializer,
-    TeamMemberSerializer,
-    TeamSerializer,
-    TeamUpdateSerializer,
-)
+from apps.management.models import (CodeCommit, GitHubIntegration, Integration,
+                                    Project, Team, TeamMember)
+from apps.management.serializers import (CodeCommitSerializer,
+                                         GitHubIntegrationSerializer,
+                                         IntegrationCreateSerializer,
+                                         IntegrationSerializer,
+                                         ProjectCreateSerializer,
+                                         ProjectDetailSerializer,
+                                         ProjectSerializer,
+                                         TeamCreateSerializer,
+                                         TeamDetailSerializer,
+                                         TeamMemberCreateSerializer,
+                                         TeamMemberSerializer, TeamSerializer,
+                                         TeamUpdateSerializer)
 
 
 @pytest.mark.django_db

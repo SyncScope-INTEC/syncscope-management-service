@@ -6,14 +6,8 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 
-from apps.management.models import (
-    CodeCommit,
-    GitHubIntegration,
-    Integration,
-    Project,
-    Team,
-    TeamMember,
-)
+from apps.management.models import (CodeCommit, GitHubIntegration, Integration,
+                                    Project, Team, TeamMember)
 
 
 @pytest.mark.django_db

@@ -5,15 +5,9 @@ URL Configuration for the Management Service.
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .views import (
-    CodeCommitViewSet,
-    GitHubIntegrationViewSet,
-    IntegrationViewSet,
-    ProjectViewSet,
-    TeamMemberViewSet,
-    TeamViewSet,
-    api_home,
-)
+from .views import (CodeCommitViewSet, GitHubIntegrationViewSet,
+                    IntegrationViewSet, ProjectViewSet, TeamMemberViewSet,
+                    TeamViewSet, api_home)
 
 # Create router and register viewsets
 router = DefaultRouter()

@@ -4,22 +4,11 @@ from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory
 from django.utils import timezone
 
-from apps.management.admin import (
-    CodeCommitAdmin,
-    GitHubIntegrationAdmin,
-    IntegrationAdmin,
-    ProjectAdmin,
-    TeamAdmin,
-    TeamMemberAdmin,
-)
-from apps.management.models import (
-    CodeCommit,
-    GitHubIntegration,
-    Integration,
-    Project,
-    Team,
-    TeamMember,
-)
+from apps.management.admin import (CodeCommitAdmin, GitHubIntegrationAdmin,
+                                   IntegrationAdmin, ProjectAdmin, TeamAdmin,
+                                   TeamMemberAdmin)
+from apps.management.models import (CodeCommit, GitHubIntegration, Integration,
+                                    Project, Team, TeamMember)
 
 
 @pytest.mark.django_db

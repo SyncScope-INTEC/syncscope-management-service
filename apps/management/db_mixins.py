@@ -5,7 +5,8 @@ Database mixins with retry logic for models and views
 from django.contrib.auth.models import BaseUserManager
 from django.db import models
 
-from config.database_retry import RetryableQuerySet, atomic_with_retry, database_retry
+from config.database_retry import (RetryableQuerySet, atomic_with_retry,
+                                   database_retry)
 
 
 class RetryableModelMixin:
@@ -139,7 +140,8 @@ class ServerlessViewMixin:
     """Mixin for views to handle serverless database connections"""
 
     def dispatch(self, request, *args, **kwargs):
-        from config.database_retry import DatabaseHealthCheck, close_old_connections
+        from config.database_retry import (DatabaseHealthCheck,
+                                           close_old_connections)
 
         # Check database health before processing request
         if not DatabaseHealthCheck.is_healthy():
@@ -161,7 +163,8 @@ class ServerlessViewMixin:
         return super().dispatch(request, *args, **kwargs)
 
     def handle_exception(self, exc):
-        from config.database_retry import DatabaseHealthCheck, is_retryable_error
+        from config.database_retry import (DatabaseHealthCheck,
+                                           is_retryable_error)
 
         if is_retryable_error(exc):
             DatabaseHealthCheck.mark_unhealthy()
