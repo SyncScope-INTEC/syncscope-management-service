@@ -217,7 +217,7 @@ SIMPLE_JWT = {
     "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
-    "AUTH_TOKEN_CLASSES": ("apps.authentication.tokens.SecureAccessToken",),
+    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
     "TOKEN_TYPE_CLAIM": "token_type",
     # Security enhancements to mitigate CVE-2024-22513
     "CHECK_REVOKE_TOKEN": True,  # Check if token should be revoked
@@ -404,13 +404,8 @@ SPECTACULAR_SETTINGS = {
         "sortPropsAlphabetically": True,
         "payloadSampleIdx": 0,
     },
-    # Authentication whitelist
+    # Authentication whitelist - management service has its own views
     "AUTHENTICATION_WHITELIST": [
-        "apps.authentication.views.LoginView",
-        "apps.authentication.views.RegisterView",
-        "apps.authentication.views.verify_token",
-        "apps.authentication.oauth.github_oauth_url",
-        "apps.authentication.oauth.github_oauth_callback",
-        "apps.authentication.views.api_home",
+        "apps.management.views.api_home",
     ],
 }

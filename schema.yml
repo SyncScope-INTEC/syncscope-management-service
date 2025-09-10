@@ -1,0 +1,2257 @@
+openapi: 3.0.3
+info:
+  title: SyncScope Management Service API
+  version: 1.0.0
+  description: Team and project management service for SyncScope platform
+paths:
+  /:
+    get:
+      operationId: root_retrieve
+      description: API home page for the Management Service.
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /health/:
+    get:
+      operationId: health_retrieve
+      description: Check the health status of the service including database and cache
+        connections.
+      summary: Health check endpoint
+      tags:
+      - Health
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    example: '2024-01-01T12:00:00Z'
+                  version:
+                    type: string
+                    example: 1.0.0
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: healthy
+                      cache:
+                        type: string
+                        example: healthy
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: unhealthy
+                  errors:
+                    type: array
+                    items:
+                      type: string
+          description: ''
+  /health/live/:
+    get:
+      operationId: health_live_retrieve
+      description: Check if the service is alive (basic endpoint for load balancers).
+      summary: Liveness check endpoint
+      tags:
+      - Health
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: alive
+          description: ''
+  /health/ready/:
+    get:
+      operationId: health_ready_retrieve
+      description: Check if the service is ready to accept requests.
+      summary: Readiness check endpoint
+      tags:
+      - Health
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: not ready
+          description: ''
+  /management/:
+    get:
+      operationId: root_retrieve_2
+      description: API home page for the Management Service.
+      security:
+      - Bearer: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /management/api/commits/:
+    get:
+      operationId: api_commits_list
+      description: Get a list of code commits the user has access to.
+      summary: List code commits
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Projects
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCodeCommitList'
+          description: ''
+  /management/api/commits/{id}/:
+    get:
+      operationId: api_commits_retrieve
+      description: Get detailed information about a specific commit.
+      summary: Get commit details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this code commit.
+        required: true
+      tags:
+      - Projects
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodeCommit'
+          description: ''
+  /management/api/github-integrations/:
+    get:
+      operationId: api_github_integrations_list
+      description: Get a list of all GitHub integrations the user has access to.
+      summary: List GitHub integrations
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Integrations
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGitHubIntegrationList'
+          description: ''
+    post:
+      operationId: api_github_integrations_create
+      description: Create a new GitHub integration for a project.
+      summary: Create GitHub integration
+      tags:
+      - Integrations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GitHubIntegrationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GitHubIntegrationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GitHubIntegrationRequest'
+        required: true
+      security:
+      - Bearer: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubIntegration'
+          description: ''
+  /management/api/github-integrations/{id}/:
+    get:
+      operationId: api_github_integrations_retrieve
+      description: Get detailed information about a specific GitHub integration.
+      summary: Get GitHub integration details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this git hub integration.
+        required: true
+      tags:
+      - Integrations
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubIntegration'
+          description: ''
+    put:
+      operationId: api_github_integrations_update
+      description: Update GitHub integration configuration.
+      summary: Update GitHub integration
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this git hub integration.
+        required: true
+      tags:
+      - Integrations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GitHubIntegrationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GitHubIntegrationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GitHubIntegrationRequest'
+        required: true
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubIntegration'
+          description: ''
+    patch:
+      operationId: api_github_integrations_partial_update
+      description: ViewSet for managing GitHub integrations.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this git hub integration.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedGitHubIntegrationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedGitHubIntegrationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedGitHubIntegrationRequest'
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubIntegration'
+          description: ''
+    delete:
+      operationId: api_github_integrations_destroy
+      description: Delete a GitHub integration.
+      summary: Delete GitHub integration
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this git hub integration.
+        required: true
+      tags:
+      - Integrations
+      security:
+      - Bearer: []
+      responses:
+        '204':
+          description: No response body
+  /management/api/github-integrations/{id}/sync/:
+    post:
+      operationId: api_github_integrations_sync_create
+      description: Trigger a manual sync for a GitHub integration.
+      summary: Sync GitHub integration
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this git hub integration.
+        required: true
+      tags:
+      - Integrations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GitHubIntegrationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GitHubIntegrationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GitHubIntegrationRequest'
+        required: true
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitHubIntegration'
+          description: ''
+  /management/api/integrations/:
+    get:
+      operationId: api_integrations_list
+      description: Get a list of all integrations the user has access to.
+      summary: List integrations
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Integrations
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedIntegrationList'
+          description: ''
+    post:
+      operationId: api_integrations_create
+      description: Create a new integration for a project.
+      summary: Create integration
+      tags:
+      - Integrations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntegrationCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/IntegrationCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/IntegrationCreateRequest'
+        required: true
+      security:
+      - Bearer: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationCreate'
+          description: ''
+  /management/api/integrations/{id}/:
+    get:
+      operationId: api_integrations_retrieve
+      description: Get detailed information about a specific integration.
+      summary: Get integration details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this integration.
+        required: true
+      tags:
+      - Integrations
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Integration'
+          description: ''
+    put:
+      operationId: api_integrations_update
+      description: Update integration configuration.
+      summary: Update integration
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this integration.
+        required: true
+      tags:
+      - Integrations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntegrationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/IntegrationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/IntegrationRequest'
+        required: true
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Integration'
+          description: ''
+    patch:
+      operationId: api_integrations_partial_update
+      description: ViewSet for managing integrations.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this integration.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedIntegrationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedIntegrationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedIntegrationRequest'
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Integration'
+          description: ''
+    delete:
+      operationId: api_integrations_destroy
+      description: Delete an integration.
+      summary: Delete integration
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this integration.
+        required: true
+      tags:
+      - Integrations
+      security:
+      - Bearer: []
+      responses:
+        '204':
+          description: No response body
+  /management/api/projects/:
+    get:
+      operationId: api_projects_list
+      description: Get a list of projects the user has access to.
+      summary: List projects
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Projects
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectList'
+          description: ''
+    post:
+      operationId: api_projects_create
+      description: Create a new project.
+      summary: Create project
+      tags:
+      - Projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+        required: true
+      security:
+      - Bearer: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectCreate'
+          description: ''
+  /management/api/projects/{id}/:
+    get:
+      operationId: api_projects_retrieve
+      description: Get detailed information about a specific project.
+      summary: Get project details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this project.
+        required: true
+      tags:
+      - Projects
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectDetail'
+          description: ''
+    put:
+      operationId: api_projects_update
+      description: Update project information.
+      summary: Update project
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this project.
+        required: true
+      tags:
+      - Projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProjectRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProjectRequest'
+        required: true
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+    patch:
+      operationId: api_projects_partial_update
+      description: ViewSet for managing projects.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this project.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectRequest'
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+    delete:
+      operationId: api_projects_destroy
+      description: Delete a project and all its associated data.
+      summary: Delete project
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this project.
+        required: true
+      tags:
+      - Projects
+      security:
+      - Bearer: []
+      responses:
+        '204':
+          description: No response body
+  /management/api/projects/{id}/commits/:
+    get:
+      operationId: api_projects_commits_retrieve
+      description: Get recent commits for a specific project.
+      summary: Get project commits
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this project.
+        required: true
+      tags:
+      - Projects
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+  /management/api/projects/{id}/integrations/:
+    get:
+      operationId: api_projects_integrations_retrieve
+      description: Get all integrations for a specific project.
+      summary: Get project integrations
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this project.
+        required: true
+      tags:
+      - Projects
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+    post:
+      operationId: api_projects_integrations_create
+      description: Get all integrations for a specific project.
+      summary: Get project integrations
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this project.
+        required: true
+      tags:
+      - Projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProjectRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProjectRequest'
+        required: true
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+  /management/api/team-members/:
+    get:
+      operationId: api_team_members_list
+      description: Get a list of all team members the user has access to.
+      summary: List team members
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Team Members
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTeamMemberList'
+          description: ''
+    post:
+      operationId: api_team_members_create
+      description: Add a new member to a team.
+      summary: Add team member
+      tags:
+      - Team Members
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamMemberCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TeamMemberCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TeamMemberCreateRequest'
+        required: true
+      security:
+      - Bearer: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMember'
+          description: ''
+  /management/api/team-members/{id}/:
+    get:
+      operationId: api_team_members_retrieve
+      description: Get detailed information about a specific team member.
+      summary: Get team member details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this team member.
+        required: true
+      tags:
+      - Team Members
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMember'
+          description: ''
+    put:
+      operationId: api_team_members_update
+      description: Update team member role or information.
+      summary: Update team member
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this team member.
+        required: true
+      tags:
+      - Team Members
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamMemberRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TeamMemberRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TeamMemberRequest'
+        required: true
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMember'
+          description: ''
+    patch:
+      operationId: api_team_members_partial_update
+      description: ViewSet for managing team members.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this team member.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTeamMemberRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTeamMemberRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTeamMemberRequest'
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMember'
+          description: ''
+    delete:
+      operationId: api_team_members_destroy
+      description: Remove a member from a team.
+      summary: Remove team member
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this team member.
+        required: true
+      tags:
+      - Team Members
+      security:
+      - Bearer: []
+      responses:
+        '204':
+          description: No response body
+  /management/api/teams/:
+    get:
+      operationId: api_teams_list
+      description: Get a list of teams for the authenticated user's company.
+      summary: List teams
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - Teams
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTeamList'
+          description: ''
+    post:
+      operationId: api_teams_create
+      description: Create a new team.
+      summary: Create team
+      tags:
+      - Teams
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TeamCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TeamCreateRequest'
+        required: true
+      security:
+      - Bearer: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamCreate'
+          description: ''
+  /management/api/teams/{id}/:
+    get:
+      operationId: api_teams_retrieve
+      description: Get detailed information about a specific team.
+      summary: Get team details
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this team.
+        required: true
+      tags:
+      - Teams
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamDetail'
+          description: ''
+    put:
+      operationId: api_teams_update
+      description: Update team information.
+      summary: Update team
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this team.
+        required: true
+      tags:
+      - Teams
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TeamUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TeamUpdateRequest'
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamUpdate'
+          description: ''
+    patch:
+      operationId: api_teams_partial_update
+      description: ViewSet for managing teams.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this team.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTeamUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTeamUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTeamUpdateRequest'
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamUpdate'
+          description: ''
+    delete:
+      operationId: api_teams_destroy
+      description: Delete a team and all its associated data.
+      summary: Delete team
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this team.
+        required: true
+      tags:
+      - Teams
+      security:
+      - Bearer: []
+      responses:
+        '204':
+          description: No response body
+  /management/api/teams/{id}/members/:
+    get:
+      operationId: api_teams_members_retrieve
+      description: Get all members of a specific team.
+      summary: Get team members
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this team.
+        required: true
+      tags:
+      - Teams
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+          description: ''
+    post:
+      operationId: api_teams_members_create
+      description: Get all members of a specific team.
+      summary: Get team members
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this team.
+        required: true
+      tags:
+      - Teams
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TeamRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TeamRequest'
+        required: true
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+          description: ''
+  /management/api/teams/{id}/projects/:
+    get:
+      operationId: api_teams_projects_retrieve
+      description: Get all projects belonging to a specific team.
+      summary: Get team projects
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this team.
+        required: true
+      tags:
+      - Teams
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+          description: ''
+components:
+  schemas:
+    CodeCommit:
+      type: object
+      description: Serializer for Code Commit model.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        project:
+          type: string
+          format: uuid
+        project_name:
+          type: string
+          readOnly: true
+        commit_hash:
+          type: string
+          maxLength: 40
+        author_email:
+          type: string
+          format: email
+          maxLength: 254
+        author_name:
+          type: string
+          maxLength: 255
+        message:
+          type: string
+        branch:
+          type: string
+          maxLength: 255
+        timestamp:
+          type: string
+          format: date-time
+        files_changed:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        insertions:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        deletions:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+        net_changes:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - author_email
+      - author_name
+      - commit_hash
+      - created_at
+      - id
+      - message
+      - net_changes
+      - project
+      - project_name
+      - timestamp
+    GitHubIntegration:
+      type: object
+      description: Serializer for GitHub Integration model.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        project:
+          type: string
+          format: uuid
+        project_name:
+          type: string
+          readOnly: true
+        repository_owner:
+          type: string
+          maxLength: 255
+        repository_name:
+          type: string
+          maxLength: 255
+        repository_url:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+        last_sync:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - last_sync
+      - project
+      - project_name
+      - repository_name
+      - repository_owner
+      - repository_url
+      - updated_at
+    GitHubIntegrationRequest:
+      type: object
+      description: Serializer for GitHub Integration model.
+      properties:
+        project:
+          type: string
+          format: uuid
+        repository_owner:
+          type: string
+          minLength: 1
+          maxLength: 255
+        repository_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        is_active:
+          type: boolean
+      required:
+      - project
+      - repository_name
+      - repository_owner
+    Integration:
+      type: object
+      description: Serializer for Integration model.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        project:
+          type: string
+          format: uuid
+        project_name:
+          type: string
+          readOnly: true
+        type:
+          enum:
+          - github
+          - gitlab
+          - jira
+          - slack
+          - discord
+          - teams
+          - trello
+          - asana
+          - jenkins
+          - circleci
+          - custom
+          type: string
+          description: |-
+            * `github` - GitHub
+            * `gitlab` - GitLab
+            * `jira` - Jira
+            * `slack` - Slack
+            * `discord` - Discord
+            * `teams` - Microsoft Teams
+            * `trello` - Trello
+            * `asana` - Asana
+            * `jenkins` - Jenkins
+            * `circleci` - CircleCI
+            * `custom` - Custom Integration
+          x-spec-enum-id: 1fa065450dffc26f
+        config_data:
+          description: Integration-specific configuration data
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - project
+      - project_name
+      - type
+      - updated_at
+    IntegrationCreate:
+      type: object
+      description: Serializer for creating integrations.
+      properties:
+        project_id:
+          type: string
+          format: uuid
+          description: Project ID
+        type:
+          enum:
+          - github
+          - gitlab
+          - jira
+          - slack
+          - discord
+          - teams
+          - trello
+          - asana
+          - jenkins
+          - circleci
+          - custom
+          type: string
+          x-spec-enum-id: 1fa065450dffc26f
+          description: |-
+            Integration type
+
+            * `github` - GitHub
+            * `gitlab` - GitLab
+            * `jira` - Jira
+            * `slack` - Slack
+            * `discord` - Discord
+            * `teams` - Microsoft Teams
+            * `trello` - Trello
+            * `asana` - Asana
+            * `jenkins` - Jenkins
+            * `circleci` - CircleCI
+            * `custom` - Custom Integration
+        config_data:
+          description: Integration configuration data
+      required:
+      - config_data
+      - project_id
+      - type
+    IntegrationCreateRequest:
+      type: object
+      description: Serializer for creating integrations.
+      properties:
+        project_id:
+          type: string
+          format: uuid
+          description: Project ID
+        type:
+          enum:
+          - github
+          - gitlab
+          - jira
+          - slack
+          - discord
+          - teams
+          - trello
+          - asana
+          - jenkins
+          - circleci
+          - custom
+          type: string
+          x-spec-enum-id: 1fa065450dffc26f
+          description: |-
+            Integration type
+
+            * `github` - GitHub
+            * `gitlab` - GitLab
+            * `jira` - Jira
+            * `slack` - Slack
+            * `discord` - Discord
+            * `teams` - Microsoft Teams
+            * `trello` - Trello
+            * `asana` - Asana
+            * `jenkins` - Jenkins
+            * `circleci` - CircleCI
+            * `custom` - Custom Integration
+        config_data:
+          description: Integration configuration data
+      required:
+      - config_data
+      - project_id
+      - type
+    IntegrationRequest:
+      type: object
+      description: Serializer for Integration model.
+      properties:
+        project:
+          type: string
+          format: uuid
+        type:
+          enum:
+          - github
+          - gitlab
+          - jira
+          - slack
+          - discord
+          - teams
+          - trello
+          - asana
+          - jenkins
+          - circleci
+          - custom
+          type: string
+          description: |-
+            * `github` - GitHub
+            * `gitlab` - GitLab
+            * `jira` - Jira
+            * `slack` - Slack
+            * `discord` - Discord
+            * `teams` - Microsoft Teams
+            * `trello` - Trello
+            * `asana` - Asana
+            * `jenkins` - Jenkins
+            * `circleci` - CircleCI
+            * `custom` - Custom Integration
+          x-spec-enum-id: 1fa065450dffc26f
+        config_data:
+          description: Integration-specific configuration data
+        is_active:
+          type: boolean
+      required:
+      - project
+      - type
+    PaginatedCodeCommitList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeCommit'
+    PaginatedGitHubIntegrationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/GitHubIntegration'
+    PaginatedIntegrationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Integration'
+    PaginatedProjectList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+    PaginatedTeamList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Team'
+    PaginatedTeamMemberList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
+    PatchedGitHubIntegrationRequest:
+      type: object
+      description: Serializer for GitHub Integration model.
+      properties:
+        project:
+          type: string
+          format: uuid
+        repository_owner:
+          type: string
+          minLength: 1
+          maxLength: 255
+        repository_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        is_active:
+          type: boolean
+    PatchedIntegrationRequest:
+      type: object
+      description: Serializer for Integration model.
+      properties:
+        project:
+          type: string
+          format: uuid
+        type:
+          enum:
+          - github
+          - gitlab
+          - jira
+          - slack
+          - discord
+          - teams
+          - trello
+          - asana
+          - jenkins
+          - circleci
+          - custom
+          type: string
+          description: |-
+            * `github` - GitHub
+            * `gitlab` - GitLab
+            * `jira` - Jira
+            * `slack` - Slack
+            * `discord` - Discord
+            * `teams` - Microsoft Teams
+            * `trello` - Trello
+            * `asana` - Asana
+            * `jenkins` - Jenkins
+            * `circleci` - CircleCI
+            * `custom` - Custom Integration
+          x-spec-enum-id: 1fa065450dffc26f
+        config_data:
+          description: Integration-specific configuration data
+        is_active:
+          type: boolean
+    PatchedProjectRequest:
+      type: object
+      description: Serializer for Project model.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        team:
+          type: string
+          format: uuid
+        repository_url:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 500
+        url:
+          type: string
+          format: uri
+          nullable: true
+          description: Project URL (e.g., live site)
+          maxLength: 500
+    PatchedTeamMemberRequest:
+      type: object
+      description: Serializer for TeamMember model.
+      properties:
+        team:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+          description: Reference to auth.users.id
+        role:
+          enum:
+          - lead
+          - developer
+          - senior_developer
+          - junior_developer
+          - intern
+          - designer
+          - qa
+          type: string
+          description: |-
+            * `lead` - Team Lead
+            * `developer` - Developer
+            * `senior_developer` - Senior Developer
+            * `junior_developer` - Junior Developer
+            * `intern` - Intern
+            * `designer` - Designer
+            * `qa` - QA Engineer
+          x-spec-enum-id: cba5d7630c5d2b0b
+        joined_at:
+          type: string
+          format: date-time
+    PatchedTeamUpdateRequest:
+      type: object
+      description: Serializer for team update requests.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Team name
+          maxLength: 255
+        description:
+          type: string
+          description: Team description
+    Project:
+      type: object
+      description: Serializer for Project model.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        team:
+          type: string
+          format: uuid
+        team_name:
+          type: string
+          readOnly: true
+        repository_url:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 500
+        url:
+          type: string
+          format: uri
+          nullable: true
+          description: Project URL (e.g., live site)
+          maxLength: 500
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+      - team
+      - team_name
+      - updated_at
+    ProjectCreate:
+      type: object
+      description: Serializer for project creation requests.
+      properties:
+        name:
+          type: string
+          description: Project name
+          maxLength: 255
+        description:
+          type: string
+          description: Project description
+        team_id:
+          type: string
+          format: uuid
+          description: Team ID
+        repository_url:
+          type: string
+          format: uri
+          description: Repository URL
+        url:
+          type: string
+          format: uri
+          description: Project URL
+      required:
+      - name
+      - team_id
+    ProjectCreateRequest:
+      type: object
+      description: Serializer for project creation requests.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Project name
+          maxLength: 255
+        description:
+          type: string
+          description: Project description
+        team_id:
+          type: string
+          format: uuid
+          description: Team ID
+        repository_url:
+          type: string
+          format: uri
+          description: Repository URL
+        url:
+          type: string
+          format: uri
+          description: Project URL
+      required:
+      - name
+      - team_id
+    ProjectDetail:
+      type: object
+      description: Detailed serializer for Project with related data.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        team:
+          type: string
+          format: uuid
+        team_name:
+          type: string
+          readOnly: true
+        repository_url:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 500
+        url:
+          type: string
+          format: uri
+          nullable: true
+          description: Project URL (e.g., live site)
+          maxLength: 500
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        integrations_count:
+          type: string
+          readOnly: true
+        commits_count:
+          type: string
+          readOnly: true
+        latest_commit:
+          type: string
+          readOnly: true
+      required:
+      - commits_count
+      - created_at
+      - id
+      - integrations_count
+      - latest_commit
+      - name
+      - team
+      - team_name
+      - updated_at
+    ProjectRequest:
+      type: object
+      description: Serializer for Project model.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        team:
+          type: string
+          format: uuid
+        repository_url:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 500
+        url:
+          type: string
+          format: uri
+          nullable: true
+          description: Project URL (e.g., live site)
+          maxLength: 500
+      required:
+      - name
+      - team
+    Team:
+      type: object
+      description: Serializer for Team model.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        company_id:
+          type: string
+          format: uuid
+          description: Reference to auth.companies.id
+        created_by:
+          type: string
+          format: uuid
+          description: Reference to auth.users.id
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+      - updated_at
+    TeamCreate:
+      type: object
+      description: Serializer for team creation requests.
+      properties:
+        name:
+          type: string
+          description: Team name
+          maxLength: 255
+        description:
+          type: string
+          description: Team description
+      required:
+      - name
+    TeamCreateRequest:
+      type: object
+      description: Serializer for team creation requests.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Team name
+          maxLength: 255
+        description:
+          type: string
+          description: Team description
+      required:
+      - name
+    TeamDetail:
+      type: object
+      description: Detailed serializer for Team with related data.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        company_id:
+          type: string
+          format: uuid
+          description: Reference to auth.companies.id
+        created_by:
+          type: string
+          format: uuid
+          description: Reference to auth.users.id
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        members_count:
+          type: string
+          readOnly: true
+        projects_count:
+          type: string
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - members_count
+      - name
+      - projects_count
+      - updated_at
+    TeamMember:
+      type: object
+      description: Serializer for TeamMember model.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        team:
+          type: string
+          format: uuid
+        team_name:
+          type: string
+          readOnly: true
+        user_id:
+          type: string
+          format: uuid
+          description: Reference to auth.users.id
+        user_email:
+          type: string
+          readOnly: true
+        user_name:
+          type: string
+          readOnly: true
+        role:
+          enum:
+          - lead
+          - developer
+          - senior_developer
+          - junior_developer
+          - intern
+          - designer
+          - qa
+          type: string
+          description: |-
+            * `lead` - Team Lead
+            * `developer` - Developer
+            * `senior_developer` - Senior Developer
+            * `junior_developer` - Junior Developer
+            * `intern` - Intern
+            * `designer` - Designer
+            * `qa` - QA Engineer
+          x-spec-enum-id: cba5d7630c5d2b0b
+        joined_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - team
+      - team_name
+      - updated_at
+      - user_email
+      - user_id
+      - user_name
+    TeamMemberCreateRequest:
+      type: object
+      description: Serializer for adding team members.
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: User ID to add to the team
+        role:
+          enum:
+          - lead
+          - developer
+          - senior_developer
+          - junior_developer
+          - intern
+          - designer
+          - qa
+          type: string
+          x-spec-enum-id: cba5d7630c5d2b0b
+          default: developer
+          description: |-
+            Role in the team
+
+            * `lead` - Team Lead
+            * `developer` - Developer
+            * `senior_developer` - Senior Developer
+            * `junior_developer` - Junior Developer
+            * `intern` - Intern
+            * `designer` - Designer
+            * `qa` - QA Engineer
+      required:
+      - user_id
+    TeamMemberRequest:
+      type: object
+      description: Serializer for TeamMember model.
+      properties:
+        team:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+          description: Reference to auth.users.id
+        role:
+          enum:
+          - lead
+          - developer
+          - senior_developer
+          - junior_developer
+          - intern
+          - designer
+          - qa
+          type: string
+          description: |-
+            * `lead` - Team Lead
+            * `developer` - Developer
+            * `senior_developer` - Senior Developer
+            * `junior_developer` - Junior Developer
+            * `intern` - Intern
+            * `designer` - Designer
+            * `qa` - QA Engineer
+          x-spec-enum-id: cba5d7630c5d2b0b
+        joined_at:
+          type: string
+          format: date-time
+      required:
+      - team
+      - user_id
+    TeamRequest:
+      type: object
+      description: Serializer for Team model.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        company_id:
+          type: string
+          format: uuid
+          description: Reference to auth.companies.id
+        created_by:
+          type: string
+          format: uuid
+          description: Reference to auth.users.id
+      required:
+      - name
+    TeamUpdate:
+      type: object
+      description: Serializer for team update requests.
+      properties:
+        name:
+          type: string
+          description: Team name
+          maxLength: 255
+        description:
+          type: string
+          description: Team description
+    TeamUpdateRequest:
+      type: object
+      description: Serializer for team update requests.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Team name
+          maxLength: 255
+        description:
+          type: string
+          description: Team description
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'Enter your Bearer token in the format: Bearer <token>'
+servers:
+- url: http://localhost:8002
+  description: Local development server
+- url: https://syncscope-management-service-dev.up.railway.app
+  description: Development server
+tags:
+- name: Teams
+  description: Team management endpoints including creation, updates, and team member
+    management
+- name: Projects
+  description: Project management endpoints including project creation, updates, and
+    member assignments
+- name: Integrations
+  description: External integrations management for connecting with development tools
+- name: Team Members
+  description: Team membership management and role assignments
+- name: Health
+  description: Service health check endpoints
