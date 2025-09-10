@@ -176,7 +176,7 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"
-STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+STATIC_ROOT = str(os.path.join(BASE_DIR, "staticfiles"))
 
 # Storage configuration (Django 4.2+)
 STORAGES = {
