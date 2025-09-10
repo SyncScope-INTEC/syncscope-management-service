@@ -17,18 +17,31 @@ from config.database_retry import atomic_with_retry
 
 from .authentication import AuthServiceIntegration
 from .db_mixins import ServerlessViewMixin
-from .models import (CodeCommit, GitHubIntegration, Integration, Project, Team,
-                     TeamMember)
-from .permissions import (IsOwnerOrAdmin, IsProjectMemberOrAdmin,
-                          IsTeamMemberOrAdmin)
-from .serializers import (CodeCommitSerializer, ErrorResponseSerializer,
-                          GitHubIntegrationSerializer,
-                          IntegrationCreateSerializer, IntegrationSerializer,
-                          ProjectCreateSerializer, ProjectDetailSerializer,
-                          ProjectSerializer, TeamCreateSerializer,
-                          TeamDetailSerializer, TeamMemberCreateSerializer,
-                          TeamMemberSerializer, TeamSerializer,
-                          TeamUpdateSerializer)
+from .models import (
+    CodeCommit,
+    GitHubIntegration,
+    Integration,
+    Project,
+    Team,
+    TeamMember,
+)
+from .permissions import IsOwnerOrAdmin, IsProjectMemberOrAdmin, IsTeamMemberOrAdmin
+from .serializers import (
+    CodeCommitSerializer,
+    ErrorResponseSerializer,
+    GitHubIntegrationSerializer,
+    IntegrationCreateSerializer,
+    IntegrationSerializer,
+    ProjectCreateSerializer,
+    ProjectDetailSerializer,
+    ProjectSerializer,
+    TeamCreateSerializer,
+    TeamDetailSerializer,
+    TeamMemberCreateSerializer,
+    TeamMemberSerializer,
+    TeamSerializer,
+    TeamUpdateSerializer,
+)
 
 
 @api_view(["GET"])

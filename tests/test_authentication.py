@@ -6,9 +6,11 @@ from django.contrib.auth.models import AnonymousUser
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.test import APIRequestFactory
 
-from apps.management.authentication import (AuthServiceIntegration,
-                                            RemoteJWTAuthentication,
-                                            RemoteUserProxy)
+from apps.management.authentication import (
+    AuthServiceIntegration,
+    RemoteJWTAuthentication,
+    RemoteUserProxy,
+)
 
 
 class TestRemoteUserProxy:

@@ -6,9 +6,11 @@ from rest_framework.test import APIRequestFactory
 
 from apps.management.authentication import RemoteUserProxy
 from apps.management.models import Project, Team, TeamMember
-from apps.management.permissions import (IsOwnerOrAdmin,
-                                         IsProjectMemberOrAdmin,
-                                         IsTeamMemberOrAdmin)
+from apps.management.permissions import (
+    IsOwnerOrAdmin,
+    IsProjectMemberOrAdmin,
+    IsTeamMemberOrAdmin,
+)
 
 
 class TestIsOwnerOrAdmin:

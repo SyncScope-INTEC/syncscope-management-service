@@ -14,8 +14,14 @@ if not settings.configured:
 from rest_framework.test import APIClient
 
 from apps.management.authentication import RemoteUserProxy
-from apps.management.models import (CodeCommit, GitHubIntegration, Integration,
-                                    Project, Team, TeamMember)
+from apps.management.models import (
+    CodeCommit,
+    GitHubIntegration,
+    Integration,
+    Project,
+    Team,
+    TeamMember,
+)
 
 
 @pytest.fixture
