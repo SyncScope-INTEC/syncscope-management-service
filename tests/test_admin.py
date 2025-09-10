@@ -185,9 +185,14 @@ class TestIntegrationAdmin:
         admin_site = AdminSite()
         admin = IntegrationAdmin(Integration, admin_site)
 
-        # Mock db_field for config_data
+        # Mock db_field for config_data with required attributes
         class MockField:
             name = "config_data"
+            choices = None
+            many_to_many = False
+            one_to_many = False
+            one_to_one = False
+            remote_field = None
 
         field = MockField()
         result = admin.formfield_for_dbfield(field, None)

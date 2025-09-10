@@ -29,8 +29,34 @@ def api_client():
     return APIClient()
 
 
+@pytest.fixture(scope="session")
+def base_user_data():
+    """Base user data that stays consistent across tests."""
+    return {
+        "user_id": "550e8400-e29b-41d4-a716-446655440000",
+        "company_id": "550e8400-e29b-41d4-a716-446655440001",
+        "email": "testuser@testcompany.com",
+        "role": "developer",
+        "first_name": "Test",
+        "last_name": "User",
+    }
+
+
+@pytest.fixture(scope="session")
+def base_admin_data():
+    """Base admin data that stays consistent across tests."""
+    return {
+        "user_id": "550e8400-e29b-41d4-a716-446655440002",
+        "company_id": "550e8400-e29b-41d4-a716-446655440003",
+        "email": "admin@testcompany.com",
+        "role": "admin",
+        "first_name": "Admin",
+        "last_name": "User",
+    }
+
+
 @pytest.fixture
-def mock_auth_service():
+def mock_auth_service(base_user_data):
     """Mock the auth service responses for testing."""
     with (
         patch("apps.management.authentication.requests.post") as mock_post,
@@ -40,52 +66,26 @@ def mock_auth_service():
         mock_post.return_value.status_code = 200
         mock_post.return_value.json.return_value = {
             "valid": True,
-            "user_id": str(uuid.uuid4()),
-            "email": "testuser@testcompany.com",
-            "role": "developer",
-            "company_id": str(uuid.uuid4()),
-            "first_name": "Test",
-            "last_name": "User",
+            **base_user_data,
         }
 
         # Mock user data response
         mock_get.return_value.status_code = 200
-        mock_get.return_value.json.return_value = {
-            "user_id": str(uuid.uuid4()),
-            "email": "testuser@testcompany.com",
-            "role": "developer",
-            "company_id": str(uuid.uuid4()),
-            "first_name": "Test",
-            "last_name": "User",
-        }
+        mock_get.return_value.json.return_value = base_user_data
 
         yield mock_post, mock_get
 
 
 @pytest.fixture
-def mock_user_data():
+def mock_user_data(base_user_data):
     """Sample user data for testing."""
-    return {
-        "user_id": str(uuid.uuid4()),
-        "email": "testuser@testcompany.com",
-        "role": "developer",
-        "company_id": str(uuid.uuid4()),
-        "first_name": "Test",
-        "last_name": "User",
-    }
+    return base_user_data.copy()
 
 
 @pytest.fixture
-def mock_admin_user_data():
+def mock_admin_user_data(base_admin_data):
     """Sample admin user data for testing."""
-    return {
-        "user_id": str(uuid.uuid4()),
-        "email": "admin@testcompany.com",
-        "role": "admin",
-        "company_id": str(uuid.uuid4()),
-        "first_name": "Admin",
-        "last_name": "User",
-    }
+    return base_admin_data.copy()
 
 
 @pytest.fixture
@@ -108,18 +108,13 @@ def authenticated_client(api_client, mock_auth_service):
 
 
 @pytest.fixture
-def admin_authenticated_client(api_client, mock_auth_service):
+def admin_authenticated_client(api_client, mock_auth_service, base_admin_data):
     """Admin API client with authentication headers."""
     # Override the mock to return admin user data
     mock_post, mock_get = mock_auth_service
     mock_post.return_value.json.return_value = {
         "valid": True,
-        "user_id": str(uuid.uuid4()),
-        "email": "admin@testcompany.com",
-        "role": "admin",
-        "company_id": str(uuid.uuid4()),
-        "first_name": "Admin",
-        "last_name": "User",
+        **base_admin_data,
     }
 
     api_client.credentials(HTTP_AUTHORIZATION="Bearer admin-jwt-token")
@@ -127,12 +122,13 @@ def admin_authenticated_client(api_client, mock_auth_service):
 
 
 @pytest.fixture
-def company_id():
+def company_id(base_user_data):
     """Sample company ID for testing."""
-    return uuid.uuid4()
+    return uuid.UUID(base_user_data["company_id"])
 
 
 @pytest.fixture
+@pytest.mark.django_db
 def team(company_id, mock_user_data):
     """Create a test team."""
     return Team.objects.create(
@@ -144,13 +140,16 @@ def team(company_id, mock_user_data):
 
 
 @pytest.fixture
+@pytest.mark.django_db
 def team_with_lead(team, mock_user_data):
     """Create a team with a team lead member."""
-    member = TeamMember.objects.create(team=team, user_id=mock_user_data["user_id"], role="lead")
+    # Use get_or_create to avoid UNIQUE constraint issues
+    member, created = TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "lead"})
     return team, member
 
 
 @pytest.fixture
+@pytest.mark.django_db
 def project(team):
     """Create a test project."""
     return Project.objects.create(
@@ -163,18 +162,25 @@ def project(team):
 
 
 @pytest.fixture
-def team_member(team, mock_user_data):
+@pytest.mark.django_db
+def team_member(team):
     """Create a test team member."""
-    return TeamMember.objects.create(team=team, user_id=mock_user_data["user_id"], role="developer")
+    # Use a different user_id to avoid conflicts
+    user_id = "550e8400-e29b-41d4-a716-446655440004"
+    member, created = TeamMember.objects.get_or_create(team=team, user_id=user_id, defaults={"role": "developer"})
+    return member
 
 
 @pytest.fixture
+@pytest.mark.django_db
 def team_lead(team, mock_user_data):
     """Create a test team lead."""
-    return TeamMember.objects.create(team=team, user_id=mock_user_data["user_id"], role="lead")
+    member, created = TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "lead"})
+    return member
 
 
 @pytest.fixture
+@pytest.mark.django_db
 def integration(project):
     """Create a test integration."""
     return Integration.objects.create(
@@ -186,6 +192,7 @@ def integration(project):
 
 
 @pytest.fixture
+@pytest.mark.django_db
 def github_integration(project):
     """Create a test GitHub integration."""
     return GitHubIntegration.objects.create(
@@ -198,6 +205,7 @@ def github_integration(project):
 
 
 @pytest.fixture
+@pytest.mark.django_db
 def code_commit(project):
     """Create a test code commit."""
     return CodeCommit.objects.create(

@@ -268,10 +268,11 @@ class TestIntegrationSerializer:
         assert data["is_active"] == integration.is_active
         assert data["project_name"] == integration.project.name
 
-    def test_integration_config_validation_github(self):
+    def test_integration_config_validation_github(self, project):
         """Test integration config validation for GitHub type."""
         serializer = IntegrationSerializer(
             data={
+                "project": project.id,
                 "type": "github",
                 "config_data": {
                     "repository_owner": "testuser",
@@ -297,10 +298,11 @@ class TestIntegrationSerializer:
         assert not serializer.is_valid()
         assert "config_data" in serializer.errors
 
-    def test_integration_config_validation_slack(self):
+    def test_integration_config_validation_slack(self, project):
         """Test integration config validation for Slack type."""
         serializer = IntegrationSerializer(
             data={
+                "project": project.id,
                 "type": "slack",
                 "config_data": {"webhook_url": "https://hooks.slack.com/test"},
             }

@@ -15,7 +15,7 @@ class IsOwnerOrAdmin(permissions.BasePermission):
 
     def has_permission(self, request, view):
         """Check if user is authenticated."""
-        return request.user and request.user.is_authenticated
+        return bool(request.user and hasattr(request.user, "is_authenticated") and request.user.is_authenticated)
 
     def has_object_permission(self, request, view, obj):
         """Check if user can access this team."""
@@ -53,7 +53,7 @@ class IsTeamMemberOrAdmin(permissions.BasePermission):
 
     def has_permission(self, request, view):
         """Check if user is authenticated."""
-        return request.user and request.user.is_authenticated
+        return bool(request.user and hasattr(request.user, "is_authenticated") and request.user.is_authenticated)
 
     def has_object_permission(self, request, view, obj):
         """Check if user can access this team member record."""
@@ -91,7 +91,7 @@ class IsProjectMemberOrAdmin(permissions.BasePermission):
 
     def has_permission(self, request, view):
         """Check if user is authenticated."""
-        return request.user and request.user.is_authenticated
+        return bool(request.user and hasattr(request.user, "is_authenticated") and request.user.is_authenticated)
 
     def has_object_permission(self, request, view, obj):
         """Check if user can access this project-related resource."""
