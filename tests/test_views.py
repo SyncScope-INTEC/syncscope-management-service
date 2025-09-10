@@ -6,24 +6,26 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 
-from apps.management.models import (CodeCommit, GitHubIntegration, Integration,
-                                    Project, Team, TeamMember)
+from apps.management.models import (
+    CodeCommit,
+    GitHubIntegration,
+    Integration,
+    Project,
+    Team,
+    TeamMember,
+)
 
 
 @pytest.mark.django_db
 class TestTeamViewSet:
 
-    def test_list_teams_authenticated(
-        self, authenticated_client, team, mock_auth_service
-    ):
+    def test_list_teams_authenticated(self, authenticated_client, team, mock_auth_service):
         """Test listing teams as authenticated user."""
         url = reverse("management:team-list")
         response = authenticated_client.get(url)
 
         assert response.status_code == status.HTTP_200_OK
-        assert (
-            len(response.data["results"]) >= 0
-        )  # May be empty if no teams for user's company
+        assert len(response.data["results"]) >= 0  # May be empty if no teams for user's company
 
     def test_list_teams_unauthenticated(self, api_client):
         """Test that unauthenticated users cannot list teams."""
@@ -42,9 +44,7 @@ class TestTeamViewSet:
         assert response.status_code == status.HTTP_201_CREATED
         assert Team.objects.filter(name="New Test Team").exists()
 
-    def test_create_team_duplicate_name(
-        self, authenticated_client, team, mock_auth_service
-    ):
+    def test_create_team_duplicate_name(self, authenticated_client, team, mock_auth_service):
         """Test creating team with duplicate name in same company."""
         url = reverse("management:team-list")
         data = {"name": team.name, "description": "Duplicate name"}
@@ -53,9 +53,7 @@ class TestTeamViewSet:
         # Should succeed as names can be duplicate across companies
         assert response.status_code == status.HTTP_201_CREATED
 
-    def test_retrieve_team_success(
-        self, authenticated_client, team_with_lead, mock_auth_service
-    ):
+    def test_retrieve_team_success(self, authenticated_client, team_with_lead, mock_auth_service):
         """Test retrieving team details."""
         team, lead = team_with_lead
         url = reverse("management:team-detail", args=[team.id])
@@ -67,9 +65,7 @@ class TestTeamViewSet:
         assert "members_count" in response.data
         assert "projects_count" in response.data
 
-    def test_update_team_as_lead(
-        self, authenticated_client, team_with_lead, mock_auth_service
-    ):
+    def test_update_team_as_lead(self, authenticated_client, team_with_lead, mock_auth_service):
         """Test updating team as team lead."""
         team, lead = team_with_lead
         url = reverse("management:team-detail", args=[team.id])
@@ -81,9 +77,7 @@ class TestTeamViewSet:
         team.refresh_from_db()
         assert team.name == "Updated Team Name"
 
-    def test_delete_team_as_lead(
-        self, authenticated_client, team_with_lead, mock_auth_service
-    ):
+    def test_delete_team_as_lead(self, authenticated_client, team_with_lead, mock_auth_service):
         """Test deleting team as team lead."""
         team, lead = team_with_lead
         url = reverse("management:team-detail", args=[team.id])
@@ -93,9 +87,7 @@ class TestTeamViewSet:
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not Team.objects.filter(id=team.id).exists()
 
-    def test_team_members_endpoint(
-        self, authenticated_client, team_with_lead, mock_auth_service
-    ):
+    def test_team_members_endpoint(self, authenticated_client, team_with_lead, mock_auth_service):
         """Test getting team members."""
         team, lead = team_with_lead
         url = reverse("management:team-members", args=[team.id])
@@ -105,9 +97,7 @@ class TestTeamViewSet:
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) >= 1  # At least the lead
 
-    def test_add_team_member(
-        self, authenticated_client, team_with_lead, mock_auth_service
-    ):
+    def test_add_team_member(self, authenticated_client, team_with_lead, mock_auth_service):
         """Test adding a member to team."""
         team, lead = team_with_lead
         url = reverse("management:team-members", args=[team.id])
@@ -118,9 +108,7 @@ class TestTeamViewSet:
         assert response.status_code == status.HTTP_201_CREATED
         assert TeamMember.objects.filter(team=team, user_id=data["user_id"]).exists()
 
-    def test_team_projects_endpoint(
-        self, authenticated_client, team_with_lead, project, mock_auth_service
-    ):
+    def test_team_projects_endpoint(self, authenticated_client, team_with_lead, project, mock_auth_service):
         """Test getting team projects."""
         team, lead = team_with_lead
         # Update project to belong to this team
@@ -138,9 +126,7 @@ class TestTeamViewSet:
 @pytest.mark.django_db
 class TestProjectViewSet:
 
-    def test_list_projects_authenticated(
-        self, authenticated_client, project, mock_auth_service
-    ):
+    def test_list_projects_authenticated(self, authenticated_client, project, mock_auth_service):
         """Test listing projects as authenticated user."""
         url = reverse("management:project-list")
         response = authenticated_client.get(url)
@@ -148,9 +134,7 @@ class TestProjectViewSet:
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data["results"]) >= 0
 
-    def test_create_project_success(
-        self, authenticated_client, team_with_lead, mock_auth_service
-    ):
+    def test_create_project_success(self, authenticated_client, team_with_lead, mock_auth_service):
         """Test successful project creation."""
         team, lead = team_with_lead
         url = reverse("management:project-list")
@@ -179,9 +163,7 @@ class TestProjectViewSet:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_retrieve_project_success(
-        self, authenticated_client, project, team_with_lead, mock_auth_service
-    ):
+    def test_retrieve_project_success(self, authenticated_client, project, team_with_lead, mock_auth_service):
         """Test retrieving project details."""
         team, lead = team_with_lead
         project.team = team
@@ -197,9 +179,7 @@ class TestProjectViewSet:
         assert "commits_count" in response.data
         assert "latest_commit" in response.data
 
-    def test_project_integrations_endpoint(
-        self, authenticated_client, project, team_with_lead, mock_auth_service
-    ):
+    def test_project_integrations_endpoint(self, authenticated_client, project, team_with_lead, mock_auth_service):
         """Test getting project integrations."""
         team, lead = team_with_lead
         project.team = team
@@ -212,9 +192,7 @@ class TestProjectViewSet:
         assert response.status_code == status.HTTP_200_OK
         assert isinstance(response.data, list)
 
-    def test_create_project_integration(
-        self, authenticated_client, project, team_with_lead, mock_auth_service
-    ):
+    def test_create_project_integration(self, authenticated_client, project, team_with_lead, mock_auth_service):
         """Test creating project integration."""
         team, lead = team_with_lead
         project.team = team
@@ -260,9 +238,7 @@ class TestProjectViewSet:
 @pytest.mark.django_db
 class TestTeamMemberViewSet:
 
-    def test_list_team_members(
-        self, authenticated_client, team_member, mock_auth_service
-    ):
+    def test_list_team_members(self, authenticated_client, team_member, mock_auth_service):
         """Test listing team members."""
         url = reverse("management:teammember-list")
         response = authenticated_client.get(url)
@@ -270,9 +246,7 @@ class TestTeamMemberViewSet:
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data["results"]) >= 0
 
-    def test_retrieve_team_member(
-        self, authenticated_client, team_member, team_with_lead, mock_auth_service
-    ):
+    def test_retrieve_team_member(self, authenticated_client, team_member, team_with_lead, mock_auth_service):
         """Test retrieving team member details."""
         team, lead = team_with_lead
         team_member.team = team
@@ -287,9 +261,7 @@ class TestTeamMemberViewSet:
         assert "user_email" in response.data
         assert "user_name" in response.data
 
-    def test_update_team_member_role(
-        self, authenticated_client, team_member, team_with_lead, mock_auth_service
-    ):
+    def test_update_team_member_role(self, authenticated_client, team_member, team_with_lead, mock_auth_service):
         """Test updating team member role."""
         team, lead = team_with_lead
         team_member.team = team
@@ -304,9 +276,7 @@ class TestTeamMemberViewSet:
         team_member.refresh_from_db()
         assert team_member.role == "senior_developer"
 
-    def test_remove_team_member(
-        self, authenticated_client, team_member, team_with_lead, mock_auth_service
-    ):
+    def test_remove_team_member(self, authenticated_client, team_member, team_with_lead, mock_auth_service):
         """Test removing team member."""
         team, lead = team_with_lead
         team_member.team = team
@@ -323,9 +293,7 @@ class TestTeamMemberViewSet:
 @pytest.mark.django_db
 class TestIntegrationViewSet:
 
-    def test_list_integrations(
-        self, authenticated_client, integration, team_with_lead, mock_auth_service
-    ):
+    def test_list_integrations(self, authenticated_client, integration, team_with_lead, mock_auth_service):
         """Test listing integrations."""
         team, lead = team_with_lead
         integration.project.team = team
@@ -337,9 +305,7 @@ class TestIntegrationViewSet:
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data["results"]) >= 0
 
-    def test_create_integration(
-        self, authenticated_client, project, team_with_lead, mock_auth_service
-    ):
+    def test_create_integration(self, authenticated_client, project, team_with_lead, mock_auth_service):
         """Test creating integration."""
         team, lead = team_with_lead
         project.team = team
@@ -357,9 +323,7 @@ class TestIntegrationViewSet:
         assert response.status_code == status.HTTP_201_CREATED
         assert Integration.objects.filter(project=project, type="slack").exists()
 
-    def test_retrieve_integration(
-        self, authenticated_client, integration, team_with_lead, mock_auth_service
-    ):
+    def test_retrieve_integration(self, authenticated_client, integration, team_with_lead, mock_auth_service):
         """Test retrieving integration details."""
         team, lead = team_with_lead
         integration.project.team = team
@@ -373,9 +337,7 @@ class TestIntegrationViewSet:
         assert response.data["type"] == integration.type
         assert "project_name" in response.data
 
-    def test_update_integration(
-        self, authenticated_client, integration, team_with_lead, mock_auth_service
-    ):
+    def test_update_integration(self, authenticated_client, integration, team_with_lead, mock_auth_service):
         """Test updating integration."""
         team, lead = team_with_lead
         integration.project.team = team
@@ -390,9 +352,7 @@ class TestIntegrationViewSet:
         integration.refresh_from_db()
         assert integration.is_active is False
 
-    def test_delete_integration(
-        self, authenticated_client, integration, team_with_lead, mock_auth_service
-    ):
+    def test_delete_integration(self, authenticated_client, integration, team_with_lead, mock_auth_service):
         """Test deleting integration."""
         team, lead = team_with_lead
         integration.project.team = team
@@ -439,9 +399,7 @@ class TestGitHubIntegrationViewSet:
         github_integration.project.team = team
         github_integration.project.save()
 
-        url = reverse(
-            "management:githubintegration-detail", args=[github_integration.id]
-        )
+        url = reverse("management:githubintegration-detail", args=[github_integration.id])
 
         response = authenticated_client.get(url)
 
@@ -473,9 +431,7 @@ class TestGitHubIntegrationViewSet:
 @pytest.mark.django_db
 class TestCodeCommitViewSet:
 
-    def test_list_commits(
-        self, authenticated_client, code_commit, team_with_lead, mock_auth_service
-    ):
+    def test_list_commits(self, authenticated_client, code_commit, team_with_lead, mock_auth_service):
         """Test listing code commits."""
         team, lead = team_with_lead
         code_commit.project.team = team
@@ -487,9 +443,7 @@ class TestCodeCommitViewSet:
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data["results"]) >= 0
 
-    def test_retrieve_commit(
-        self, authenticated_client, code_commit, team_with_lead, mock_auth_service
-    ):
+    def test_retrieve_commit(self, authenticated_client, code_commit, team_with_lead, mock_auth_service):
         """Test retrieving commit details."""
         team, lead = team_with_lead
         code_commit.project.team = team
@@ -528,9 +482,7 @@ class TestAPIHomeView:
 @pytest.mark.django_db
 class TestPermissions:
 
-    def test_admin_can_access_everything(
-        self, admin_authenticated_client, team, mock_auth_service
-    ):
+    def test_admin_can_access_everything(self, admin_authenticated_client, team, mock_auth_service):
         """Test that admin users can access all resources."""
         # Override mock to return admin role
         mock_post, mock_get = mock_auth_service
@@ -548,9 +500,7 @@ class TestPermissions:
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_non_member_access_denied(
-        self, authenticated_client, team, mock_auth_service
-    ):
+    def test_non_member_access_denied(self, authenticated_client, team, mock_auth_service):
         """Test that non-team members are denied access to team resources."""
         # Mock user who is not a member of this team
         mock_post, mock_get = mock_auth_service
@@ -584,9 +534,7 @@ class TestErrorHandling:
     def test_malformed_json_data(self, authenticated_client, mock_auth_service):
         """Test handling of malformed JSON data."""
         url = reverse("management:team-list")
-        response = authenticated_client.post(
-            url, data="invalid json", content_type="application/json"
-        )
+        response = authenticated_client.post(url, data="invalid json", content_type="application/json")
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 

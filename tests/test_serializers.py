@@ -5,20 +5,29 @@ import pytest
 from rest_framework.test import APIRequestFactory
 
 from apps.management.authentication import RemoteUserProxy
-from apps.management.models import (CodeCommit, GitHubIntegration, Integration,
-                                    Project, Team, TeamMember)
-from apps.management.serializers import (CodeCommitSerializer,
-                                         GitHubIntegrationSerializer,
-                                         IntegrationCreateSerializer,
-                                         IntegrationSerializer,
-                                         ProjectCreateSerializer,
-                                         ProjectDetailSerializer,
-                                         ProjectSerializer,
-                                         TeamCreateSerializer,
-                                         TeamDetailSerializer,
-                                         TeamMemberCreateSerializer,
-                                         TeamMemberSerializer, TeamSerializer,
-                                         TeamUpdateSerializer)
+from apps.management.models import (
+    CodeCommit,
+    GitHubIntegration,
+    Integration,
+    Project,
+    Team,
+    TeamMember,
+)
+from apps.management.serializers import (
+    CodeCommitSerializer,
+    GitHubIntegrationSerializer,
+    IntegrationCreateSerializer,
+    IntegrationSerializer,
+    ProjectCreateSerializer,
+    ProjectDetailSerializer,
+    ProjectSerializer,
+    TeamCreateSerializer,
+    TeamDetailSerializer,
+    TeamMemberCreateSerializer,
+    TeamMemberSerializer,
+    TeamSerializer,
+    TeamUpdateSerializer,
+)
 
 
 @pytest.mark.django_db
@@ -52,9 +61,7 @@ class TestTeamSerializer:
 
         # Should automatically set created_by and company_id from user
         assert str(validated_data.get("created_by")) == str(mock_user_data["user_id"])
-        assert str(validated_data.get("company_id")) == str(
-            mock_user_data["company_id"]
-        )
+        assert str(validated_data.get("company_id")) == str(mock_user_data["company_id"])
 
     def test_team_validation_without_context(self):
         """Test team validation without request context."""
@@ -111,17 +118,13 @@ class TestProjectSerializer:
     def test_project_team_validation_as_member(self, team, mock_user_data):
         """Test project team validation when user is team member."""
         # Create team member relationship
-        TeamMember.objects.create(
-            team=team, user_id=mock_user_data["user_id"], role="developer"
-        )
+        TeamMember.objects.create(team=team, user_id=mock_user_data["user_id"], role="developer")
 
         factory = APIRequestFactory()
         request = factory.post("/projects/")
         request.user = RemoteUserProxy(mock_user_data)
 
-        serializer = ProjectSerializer(
-            data={"name": "Test Project", "team": team.id}, context={"request": request}
-        )
+        serializer = ProjectSerializer(data={"name": "Test Project", "team": team.id}, context={"request": request})
 
         assert serializer.is_valid()
 
@@ -131,9 +134,7 @@ class TestProjectSerializer:
         request = factory.post("/projects/")
         request.user = RemoteUserProxy(mock_admin_user_data)
 
-        serializer = ProjectSerializer(
-            data={"name": "Test Project", "team": team.id}, context={"request": request}
-        )
+        serializer = ProjectSerializer(data={"name": "Test Project", "team": team.id}, context={"request": request})
 
         assert serializer.is_valid()
 
@@ -143,9 +144,7 @@ class TestProjectSerializer:
         request = factory.post("/projects/")
         request.user = RemoteUserProxy(mock_user_data)
 
-        serializer = ProjectSerializer(
-            data={"name": "Test Project", "team": team.id}, context={"request": request}
-        )
+        serializer = ProjectSerializer(data={"name": "Test Project", "team": team.id}, context={"request": request})
 
         assert not serializer.is_valid()
         assert "team" in serializer.errors
@@ -234,13 +233,9 @@ class TestTeamMemberSerializer:
     def test_team_member_validation_duplicate(self, team, mock_user_data):
         """Test team member validation prevents duplicates."""
         # Create existing member
-        TeamMember.objects.create(
-            team=team, user_id=mock_user_data["user_id"], role="developer"
-        )
+        TeamMember.objects.create(team=team, user_id=mock_user_data["user_id"], role="developer")
 
-        serializer = TeamMemberSerializer(
-            data={"team": team.id, "user_id": mock_user_data["user_id"], "role": "lead"}
-        )
+        serializer = TeamMemberSerializer(data={"team": team.id, "user_id": mock_user_data["user_id"], "role": "lead"})
 
         assert not serializer.is_valid()
         assert "non_field_errors" in serializer.errors
@@ -383,9 +378,7 @@ class TestRequestResponseSerializers:
 
     def test_team_create_serializer(self):
         """Test team creation request serializer."""
-        serializer = TeamCreateSerializer(
-            data={"name": "New Team", "description": "Team description"}
-        )
+        serializer = TeamCreateSerializer(data={"name": "New Team", "description": "Team description"})
 
         assert serializer.is_valid()
         assert serializer.validated_data["name"] == "New Team"
@@ -400,9 +393,7 @@ class TestRequestResponseSerializers:
 
     def test_team_update_serializer(self):
         """Test team update request serializer."""
-        serializer = TeamUpdateSerializer(
-            data={"name": "Updated Name", "description": "Updated description"}
-        )
+        serializer = TeamUpdateSerializer(data={"name": "Updated Name", "description": "Updated description"})
 
         assert serializer.is_valid()
 
@@ -439,9 +430,7 @@ class TestRequestResponseSerializers:
     def test_team_member_create_serializer(self):
         """Test team member creation request serializer."""
         user_id = uuid.uuid4()
-        serializer = TeamMemberCreateSerializer(
-            data={"user_id": str(user_id), "role": "developer"}
-        )
+        serializer = TeamMemberCreateSerializer(data={"user_id": str(user_id), "role": "developer"})
 
         assert serializer.is_valid()
         assert serializer.validated_data["user_id"] == user_id

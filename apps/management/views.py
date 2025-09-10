@@ -17,18 +17,31 @@ from config.database_retry import atomic_with_retry
 
 from .authentication import AuthServiceIntegration
 from .db_mixins import ServerlessViewMixin
-from .models import (CodeCommit, GitHubIntegration, Integration, Project, Team,
-                     TeamMember)
-from .permissions import (IsOwnerOrAdmin, IsProjectMemberOrAdmin,
-                          IsTeamMemberOrAdmin)
-from .serializers import (CodeCommitSerializer, ErrorResponseSerializer,
-                          GitHubIntegrationSerializer,
-                          IntegrationCreateSerializer, IntegrationSerializer,
-                          ProjectCreateSerializer, ProjectDetailSerializer,
-                          ProjectSerializer, TeamCreateSerializer,
-                          TeamDetailSerializer, TeamMemberCreateSerializer,
-                          TeamMemberSerializer, TeamSerializer,
-                          TeamUpdateSerializer)
+from .models import (
+    CodeCommit,
+    GitHubIntegration,
+    Integration,
+    Project,
+    Team,
+    TeamMember,
+)
+from .permissions import IsOwnerOrAdmin, IsProjectMemberOrAdmin, IsTeamMemberOrAdmin
+from .serializers import (
+    CodeCommitSerializer,
+    ErrorResponseSerializer,
+    GitHubIntegrationSerializer,
+    IntegrationCreateSerializer,
+    IntegrationSerializer,
+    ProjectCreateSerializer,
+    ProjectDetailSerializer,
+    ProjectSerializer,
+    TeamCreateSerializer,
+    TeamDetailSerializer,
+    TeamMemberCreateSerializer,
+    TeamMemberSerializer,
+    TeamSerializer,
+    TeamUpdateSerializer,
+)
 
 
 @api_view(["GET"])
@@ -133,9 +146,7 @@ class TeamViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
 
         if request.method == "GET":
             members = TeamMember.objects.filter(team=team)
-            serializer = TeamMemberSerializer(
-                members, many=True, context={"request": request}
-            )
+            serializer = TeamMemberSerializer(members, many=True, context={"request": request})
             return Response(serializer.data)
 
         elif request.method == "POST":
@@ -171,9 +182,7 @@ class TeamViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         """Get team projects."""
         team = self.get_object()
         projects = Project.objects.filter(team=team)
-        serializer = ProjectSerializer(
-            projects, many=True, context={"request": request}
-        )
+        serializer = ProjectSerializer(projects, many=True, context={"request": request})
         return Response(serializer.data)
 
     def _user_can_manage_team(self, user, team):
@@ -182,9 +191,7 @@ class TeamViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
             return True
 
         if hasattr(user, "id"):
-            return TeamMember.objects.filter(
-                team=team, user_id=user.id, role__in=["lead", "admin"]
-            ).exists()
+            return TeamMember.objects.filter(team=team, user_id=user.id, role__in=["lead", "admin"]).exists()
 
         return False
 
@@ -232,9 +239,7 @@ class ProjectViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
 
         if hasattr(user, "id"):
             # Get projects from teams user is a member of
-            user_teams = TeamMember.objects.filter(user_id=user.id).values_list(
-                "team", flat=True
-            )
+            user_teams = TeamMember.objects.filter(user_id=user.id).values_list("team", flat=True)
             return Project.objects.filter(team__in=user_teams)
 
         return Project.objects.none()
@@ -260,9 +265,7 @@ class ProjectViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         # Check if user has permission to create projects for this team
         user = self.request.user
         if not self._user_can_manage_team(user, team):
-            raise serializers.ValidationError(
-                "You don't have permission to create projects for this team."
-            )
+            raise serializers.ValidationError("You don't have permission to create projects for this team.")
 
         Project.objects.create(
             name=serializer.validated_data["name"],
@@ -284,9 +287,7 @@ class ProjectViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
 
         if request.method == "GET":
             integrations = Integration.objects.filter(project=project)
-            serializer = IntegrationSerializer(
-                integrations, many=True, context={"request": request}
-            )
+            serializer = IntegrationSerializer(integrations, many=True, context={"request": request})
             return Response(serializer.data)
 
         elif request.method == "POST":
@@ -314,9 +315,7 @@ class ProjectViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         """Get project commits."""
         project = self.get_object()
         commits = CodeCommit.objects.filter(project=project)[:50]  # Limit to recent 50
-        serializer = CodeCommitSerializer(
-            commits, many=True, context={"request": request}
-        )
+        serializer = CodeCommitSerializer(commits, many=True, context={"request": request})
         return Response(serializer.data)
 
     def _user_can_manage_team(self, user, team):
@@ -325,9 +324,7 @@ class ProjectViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
             return True
 
         if hasattr(user, "id"):
-            return TeamMember.objects.filter(
-                team=team, user_id=user.id, role__in=["lead"]
-            ).exists()
+            return TeamMember.objects.filter(team=team, user_id=user.id, role__in=["lead"]).exists()
 
         return False
 
@@ -375,9 +372,7 @@ class TeamMemberViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
 
         if hasattr(user, "id"):
             # Get members from teams user is a member of
-            user_teams = TeamMember.objects.filter(user_id=user.id).values_list(
-                "team", flat=True
-            )
+            user_teams = TeamMember.objects.filter(user_id=user.id).values_list("team", flat=True)
             return TeamMember.objects.filter(team__in=user_teams)
 
         return TeamMember.objects.none()
@@ -426,12 +421,8 @@ class IntegrationViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
 
         if hasattr(user, "id"):
             # Get integrations from projects user has access to
-            user_teams = TeamMember.objects.filter(user_id=user.id).values_list(
-                "team", flat=True
-            )
-            user_projects = Project.objects.filter(team__in=user_teams).values_list(
-                "id", flat=True
-            )
+            user_teams = TeamMember.objects.filter(user_id=user.id).values_list("team", flat=True)
+            user_projects = Project.objects.filter(team__in=user_teams).values_list("id", flat=True)
             return Integration.objects.filter(project__in=user_projects)
 
         return Integration.objects.none()
@@ -479,12 +470,8 @@ class GitHubIntegrationViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
 
         if hasattr(user, "id"):
             # Get GitHub integrations from projects user has access to
-            user_teams = TeamMember.objects.filter(user_id=user.id).values_list(
-                "team", flat=True
-            )
-            user_projects = Project.objects.filter(team__in=user_teams).values_list(
-                "id", flat=True
-            )
+            user_teams = TeamMember.objects.filter(user_id=user.id).values_list("team", flat=True)
+            user_projects = Project.objects.filter(team__in=user_teams).values_list("id", flat=True)
             return GitHubIntegration.objects.filter(project__in=user_projects)
 
         return GitHubIntegration.objects.none()
@@ -538,12 +525,8 @@ class CodeCommitViewSet(ServerlessViewMixin, viewsets.ReadOnlyModelViewSet):
 
         if hasattr(user, "id"):
             # Get commits from projects user has access to
-            user_teams = TeamMember.objects.filter(user_id=user.id).values_list(
-                "team", flat=True
-            )
-            user_projects = Project.objects.filter(team__in=user_teams).values_list(
-                "id", flat=True
-            )
+            user_teams = TeamMember.objects.filter(user_id=user.id).values_list("team", flat=True)
+            user_projects = Project.objects.filter(team__in=user_teams).values_list("id", flat=True)
             return CodeCommit.objects.filter(project__in=user_projects)
 
         return CodeCommit.objects.none()

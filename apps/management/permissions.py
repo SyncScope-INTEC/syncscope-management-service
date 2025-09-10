@@ -39,9 +39,7 @@ class IsOwnerOrAdmin(permissions.BasePermission):
                     return True
                 else:
                     # Check if user is a team lead for write operations
-                    is_lead = TeamMember.objects.filter(
-                        team=obj, user_id=user.id, role="lead"
-                    ).exists()
+                    is_lead = TeamMember.objects.filter(team=obj, user_id=user.id, role="lead").exists()
                     return is_lead
 
         return False
@@ -72,17 +70,13 @@ class IsTeamMemberOrAdmin(permissions.BasePermission):
 
         # Check if user is a lead of the team
         if hasattr(user, "id") and hasattr(obj, "team"):
-            is_lead = TeamMember.objects.filter(
-                team=obj.team, user_id=user.id, role="lead"
-            ).exists()
+            is_lead = TeamMember.objects.filter(team=obj.team, user_id=user.id, role="lead").exists()
             if is_lead:
                 return True
 
         # Check if user is a member of the same team (for read operations)
         if hasattr(user, "id") and hasattr(obj, "team"):
-            is_member = TeamMember.objects.filter(
-                team=obj.team, user_id=user.id
-            ).exists()
+            is_member = TeamMember.objects.filter(team=obj.team, user_id=user.id).exists()
             if is_member and request.method in permissions.SAFE_METHODS:
                 return True
 
@@ -117,18 +111,14 @@ class IsProjectMemberOrAdmin(permissions.BasePermission):
 
         # Check if user is a member of the project's team
         if hasattr(user, "id") and hasattr(project, "team"):
-            is_member = TeamMember.objects.filter(
-                team=project.team, user_id=user.id
-            ).exists()
+            is_member = TeamMember.objects.filter(team=project.team, user_id=user.id).exists()
             if is_member:
                 # Team members can read, but only leads can modify
                 if request.method in permissions.SAFE_METHODS:
                     return True
                 else:
                     # Check if user is a team lead for write operations
-                    is_lead = TeamMember.objects.filter(
-                        team=project.team, user_id=user.id, role="lead"
-                    ).exists()
+                    is_lead = TeamMember.objects.filter(team=project.team, user_id=user.id, role="lead").exists()
                     return is_lead
 
         return False

@@ -6,9 +6,11 @@ from django.contrib.auth.models import AnonymousUser
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.test import APIRequestFactory
 
-from apps.management.authentication import (AuthServiceIntegration,
-                                            RemoteJWTAuthentication,
-                                            RemoteUserProxy)
+from apps.management.authentication import (
+    AuthServiceIntegration,
+    RemoteJWTAuthentication,
+    RemoteUserProxy,
+)
 
 
 class TestRemoteUserProxy:
@@ -189,9 +191,7 @@ class TestRemoteJWTAuthentication:
 
         auth = RemoteJWTAuthentication()
 
-        with pytest.raises(
-            AuthenticationFailed, match="Authentication service unavailable"
-        ):
+        with pytest.raises(AuthenticationFailed, match="Authentication service unavailable"):
             auth.authenticate(request)
 
     def test_authenticate_header(self):
@@ -310,9 +310,7 @@ class TestAuthServiceIntegration:
         """Test permission checking for admin user."""
         mock_get_user.return_value = {"user_id": str(uuid.uuid4()), "role": "admin"}
 
-        result = AuthServiceIntegration.check_user_permissions(
-            str(uuid.uuid4()), ["manage_teams"], "test-token"
-        )
+        result = AuthServiceIntegration.check_user_permissions(str(uuid.uuid4()), ["manage_teams"], "test-token")
 
         assert result is True
 
@@ -321,9 +319,7 @@ class TestAuthServiceIntegration:
         """Test permission checking for non-admin user."""
         mock_get_user.return_value = {"user_id": str(uuid.uuid4()), "role": "developer"}
 
-        result = AuthServiceIntegration.check_user_permissions(
-            str(uuid.uuid4()), ["manage_teams"], "test-token"
-        )
+        result = AuthServiceIntegration.check_user_permissions(str(uuid.uuid4()), ["manage_teams"], "test-token")
 
         assert result is False
 
@@ -332,9 +328,7 @@ class TestAuthServiceIntegration:
         """Test permission checking when user not found."""
         mock_get_user.return_value = None
 
-        result = AuthServiceIntegration.check_user_permissions(
-            str(uuid.uuid4()), ["manage_teams"], "test-token"
-        )
+        result = AuthServiceIntegration.check_user_permissions(str(uuid.uuid4()), ["manage_teams"], "test-token")
 
         assert result is False
 
@@ -391,6 +385,4 @@ class TestAuthenticationIntegration:
 
         for endpoint in endpoints:
             response = client.get(endpoint)
-            assert (
-                response.status_code == 401
-            ), f"Endpoint {endpoint} should require authentication"
+            assert response.status_code == 401, f"Endpoint {endpoint} should require authentication"

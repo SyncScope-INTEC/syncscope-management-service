@@ -9,8 +9,7 @@ from rest_framework.response import Response
 
 from .models import Company, User
 from .serializers import UserProfileSerializer
-from .utils import (create_user_session, extract_domain_from_email,
-                    get_tokens_for_user)
+from .utils import create_user_session, extract_domain_from_email, get_tokens_for_user
 
 
 def exchange_code_for_token(code):
@@ -53,13 +52,9 @@ def get_github_user_data(access_token):
         emails_response.raise_for_status()
         emails_data = emails_response.json()
 
-        primary_email = next(
-            (email["email"] for email in emails_data if email["primary"]), None
-        )
+        primary_email = next((email["email"] for email in emails_data if email["primary"]), None)
         if not primary_email:
-            primary_email = user_data.get("email") or (
-                emails_data[0]["email"] if emails_data else None
-            )
+            primary_email = user_data.get("email") or (emails_data[0]["email"] if emails_data else None)
     except Exception:
         primary_email = user_data.get("email")
 
@@ -107,9 +102,7 @@ def create_or_update_user_from_github(github_data):
             company_name = github_data["company"].strip()
             if company_name:
                 domain = extract_domain_from_email(email)
-                company, _ = Company.objects.get_or_create(
-                    name=company_name, defaults={"domain": domain}
-                )
+                company, _ = Company.objects.get_or_create(name=company_name, defaults={"domain": domain})
 
         user = User.objects.create_user(
             email=email,
@@ -160,9 +153,7 @@ def github_oauth_callback(request):
             )
 
     except requests.RequestException as e:
-        return Response(
-            {"error": f"GitHub API error: {str(e)}"}, status=status.HTTP_502_BAD_GATEWAY
-        )
+        return Response({"error": f"GitHub API error: {str(e)}"}, status=status.HTTP_502_BAD_GATEWAY)
 
     except ValueError as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -188,10 +179,7 @@ def github_oauth_url(request):
     redirect_uri = request.build_absolute_uri("/auth/github/callback/")
 
     # Ensure HTTPS for production deployments
-    if (
-        request.META.get("HTTP_X_FORWARDED_PROTO") == "https"
-        or "railway.app" in redirect_uri
-    ):
+    if request.META.get("HTTP_X_FORWARDED_PROTO") == "https" or "railway.app" in redirect_uri:
         redirect_uri = redirect_uri.replace("http://", "https://")
 
     oauth_url = (

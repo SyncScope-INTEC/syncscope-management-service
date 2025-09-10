@@ -6,9 +6,11 @@ from rest_framework.test import APIRequestFactory
 
 from apps.management.authentication import RemoteUserProxy
 from apps.management.models import Project, Team, TeamMember
-from apps.management.permissions import (IsOwnerOrAdmin,
-                                         IsProjectMemberOrAdmin,
-                                         IsTeamMemberOrAdmin)
+from apps.management.permissions import (
+    IsOwnerOrAdmin,
+    IsProjectMemberOrAdmin,
+    IsTeamMemberOrAdmin,
+)
 
 
 class TestIsOwnerOrAdmin:
@@ -56,9 +58,7 @@ class TestIsOwnerOrAdmin:
     def test_has_object_permission_owner(self, company_id):
         """Test object permission for resource owner."""
         user_id = uuid.uuid4()
-        team = Team.objects.create(
-            name="Test Team", company_id=company_id, created_by=user_id
-        )
+        team = Team.objects.create(name="Test Team", company_id=company_id, created_by=user_id)
 
         factory = APIRequestFactory()
         request = factory.get("/")
@@ -113,9 +113,7 @@ class TestIsOwnerOrAdmin:
         """Test object permission for user with no access."""
         factory = APIRequestFactory()
         request = factory.get("/")
-        request.user = RemoteUserProxy(
-            {"user_id": str(uuid.uuid4()), "role": "developer"}
-        )
+        request.user = RemoteUserProxy({"user_id": str(uuid.uuid4()), "role": "developer"})
 
         permission = IsOwnerOrAdmin()
         assert permission.has_object_permission(request, None, team) is False
@@ -158,9 +156,7 @@ class TestIsTeamMemberOrAdmin:
         """Test object permission for accessing own team member record."""
         factory = APIRequestFactory()
         request = factory.get("/")
-        request.user = RemoteUserProxy(
-            {"user_id": str(team_member.user_id), "role": "developer"}
-        )
+        request.user = RemoteUserProxy({"user_id": str(team_member.user_id), "role": "developer"})
 
         permission = IsTeamMemberOrAdmin()
         assert permission.has_object_permission(request, None, team_member) is True
@@ -222,9 +218,7 @@ class TestIsTeamMemberOrAdmin:
         """Test object permission for user with no access."""
         factory = APIRequestFactory()
         request = factory.get("/")
-        request.user = RemoteUserProxy(
-            {"user_id": str(uuid.uuid4()), "role": "developer"}
-        )
+        request.user = RemoteUserProxy({"user_id": str(uuid.uuid4()), "role": "developer"})
 
         permission = IsTeamMemberOrAdmin()
         assert permission.has_object_permission(request, None, team_member) is False
@@ -329,9 +323,7 @@ class TestIsProjectMemberOrAdmin:
 
         factory = APIRequestFactory()
         request = factory.get("/")
-        request.user = RemoteUserProxy(
-            {"user_id": str(uuid.uuid4()), "role": "developer"}
-        )
+        request.user = RemoteUserProxy({"user_id": str(uuid.uuid4()), "role": "developer"})
 
         permission = IsProjectMemberOrAdmin()
         # Should handle objects that don't have project attribute
@@ -346,9 +338,7 @@ class TestIsProjectMemberOrAdmin:
         """Test object permission for user with no access."""
         factory = APIRequestFactory()
         request = factory.get("/")
-        request.user = RemoteUserProxy(
-            {"user_id": str(uuid.uuid4()), "role": "developer"}
-        )
+        request.user = RemoteUserProxy({"user_id": str(uuid.uuid4()), "role": "developer"})
 
         permission = IsProjectMemberOrAdmin()
         assert permission.has_object_permission(request, None, project) is False
@@ -362,13 +352,9 @@ class TestPermissionsIntegration:
         user_id = uuid.uuid4()
 
         # Create two teams
-        team1 = Team.objects.create(
-            name="Team 1", company_id=company_id, created_by=user_id
-        )
+        team1 = Team.objects.create(name="Team 1", company_id=company_id, created_by=user_id)
 
-        team2 = Team.objects.create(
-            name="Team 2", company_id=company_id, created_by=uuid.uuid4()
-        )
+        team2 = Team.objects.create(name="Team 2", company_id=company_id, created_by=uuid.uuid4())
 
         # User is member of team1 only
         TeamMember.objects.create(team=team1, user_id=user_id, role="lead")
@@ -389,9 +375,7 @@ class TestPermissionsIntegration:
         """Test that project permissions cascade from team membership."""
         user_id = uuid.uuid4()
 
-        team = Team.objects.create(
-            name="Test Team", company_id=company_id, created_by=uuid.uuid4()
-        )
+        team = Team.objects.create(name="Test Team", company_id=company_id, created_by=uuid.uuid4())
 
         project = Project.objects.create(name="Test Project", team=team)
 
@@ -424,9 +408,7 @@ class TestPermissionsIntegration:
         del mock_obj.created_by
         del mock_obj.id
 
-        request.user = RemoteUserProxy(
-            {"user_id": str(uuid.uuid4()), "role": "developer"}
-        )
+        request.user = RemoteUserProxy({"user_id": str(uuid.uuid4()), "role": "developer"})
 
         # Should handle missing attributes gracefully
         try:

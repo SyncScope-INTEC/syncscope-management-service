@@ -4,11 +4,22 @@ from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory
 from django.utils import timezone
 
-from apps.management.admin import (CodeCommitAdmin, GitHubIntegrationAdmin,
-                                   IntegrationAdmin, ProjectAdmin, TeamAdmin,
-                                   TeamMemberAdmin)
-from apps.management.models import (CodeCommit, GitHubIntegration, Integration,
-                                    Project, Team, TeamMember)
+from apps.management.admin import (
+    CodeCommitAdmin,
+    GitHubIntegrationAdmin,
+    IntegrationAdmin,
+    ProjectAdmin,
+    TeamAdmin,
+    TeamMemberAdmin,
+)
+from apps.management.models import (
+    CodeCommit,
+    GitHubIntegration,
+    Integration,
+    Project,
+    Team,
+    TeamMember,
+)
 
 
 @pytest.mark.django_db
@@ -56,9 +67,7 @@ class TestTeamAdmin:
         fieldsets = admin.fieldsets
 
         # Check that basic information fieldset exists
-        basic_info = next(
-            (fs for fs in fieldsets if fs[0] == "Basic Information"), None
-        )
+        basic_info = next((fs for fs in fieldsets if fs[0] == "Basic Information"), None)
         assert basic_info is not None
         assert "name" in basic_info[1]["fields"]
         assert "description" in basic_info[1]["fields"]

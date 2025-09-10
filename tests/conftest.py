@@ -14,8 +14,14 @@ if not settings.configured:
 from rest_framework.test import APIClient
 
 from apps.management.authentication import RemoteUserProxy
-from apps.management.models import (CodeCommit, GitHubIntegration, Integration,
-                                    Project, Team, TeamMember)
+from apps.management.models import (
+    CodeCommit,
+    GitHubIntegration,
+    Integration,
+    Project,
+    Team,
+    TeamMember,
+)
 
 
 @pytest.fixture
@@ -26,9 +32,10 @@ def api_client():
 @pytest.fixture
 def mock_auth_service():
     """Mock the auth service responses for testing."""
-    with patch("apps.management.authentication.requests.post") as mock_post, patch(
-        "apps.management.authentication.requests.get"
-    ) as mock_get:
+    with (
+        patch("apps.management.authentication.requests.post") as mock_post,
+        patch("apps.management.authentication.requests.get") as mock_get,
+    ):
         # Mock token validation response
         mock_post.return_value.status_code = 200
         mock_post.return_value.json.return_value = {
@@ -139,9 +146,7 @@ def team(company_id, mock_user_data):
 @pytest.fixture
 def team_with_lead(team, mock_user_data):
     """Create a team with a team lead member."""
-    member = TeamMember.objects.create(
-        team=team, user_id=mock_user_data["user_id"], role="lead"
-    )
+    member = TeamMember.objects.create(team=team, user_id=mock_user_data["user_id"], role="lead")
     return team, member
 
 
@@ -160,17 +165,13 @@ def project(team):
 @pytest.fixture
 def team_member(team, mock_user_data):
     """Create a test team member."""
-    return TeamMember.objects.create(
-        team=team, user_id=mock_user_data["user_id"], role="developer"
-    )
+    return TeamMember.objects.create(team=team, user_id=mock_user_data["user_id"], role="developer")
 
 
 @pytest.fixture
 def team_lead(team, mock_user_data):
     """Create a test team lead."""
-    return TeamMember.objects.create(
-        team=team, user_id=mock_user_data["user_id"], role="lead"
-    )
+    return TeamMember.objects.create(team=team, user_id=mock_user_data["user_id"], role="lead")
 
 
 @pytest.fixture

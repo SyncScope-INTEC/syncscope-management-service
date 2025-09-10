@@ -26,29 +26,19 @@ class Command(BaseCommand):
         self.stdout.write("Cleaning up expired sessions...")
 
         # Count expired sessions
-        expired_count = UserSession.objects.filter(
-            expires_at__lt=timezone.now()
-        ).count()
+        expired_count = UserSession.objects.filter(expires_at__lt=timezone.now()).count()
 
         if expired_count == 0:
             self.stdout.write(self.style.SUCCESS("✓ No expired sessions found"))
             return
 
         if dry_run:
-            self.stdout.write(
-                self.style.WARNING(
-                    f"DRY RUN: Would delete {expired_count} expired sessions"
-                )
-            )
+            self.stdout.write(self.style.WARNING(f"DRY RUN: Would delete {expired_count} expired sessions"))
             return
 
         try:
             UserSession.cleanup_expired_sessions()
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"✓ Successfully cleaned up {expired_count} expired sessions"
-                )
-            )
+            self.stdout.write(self.style.SUCCESS(f"✓ Successfully cleaned up {expired_count} expired sessions"))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"❌ Error cleaning up sessions: {e}"))
             raise

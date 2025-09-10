@@ -6,8 +6,14 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.utils import timezone
 
-from apps.management.models import (CodeCommit, GitHubIntegration, Integration,
-                                    Project, Team, TeamMember)
+from apps.management.models import (
+    CodeCommit,
+    GitHubIntegration,
+    Integration,
+    Project,
+    Team,
+    TeamMember,
+)
 
 
 @pytest.mark.django_db
@@ -105,9 +111,7 @@ class TestTeamMemberModel:
 
     def test_create_team_member_success(self, team, mock_user_data):
         """Test successful team member creation."""
-        member = TeamMember.objects.create(
-            team=team, user_id=mock_user_data["user_id"], role="developer"
-        )
+        member = TeamMember.objects.create(team=team, user_id=mock_user_data["user_id"], role="developer")
 
         assert member.team == team
         assert member.user_id == mock_user_data["user_id"]
@@ -119,22 +123,16 @@ class TestTeamMemberModel:
 
     def test_team_member_str_representation(self, team_member):
         """Test team member string representation."""
-        expected = (
-            f"User {team_member.user_id} - {team_member.team.name} ({team_member.role})"
-        )
+        expected = f"User {team_member.user_id} - {team_member.team.name} ({team_member.role})"
         assert str(team_member) == expected
 
     def test_team_member_unique_constraint(self, team, mock_user_data):
         """Test that a user can only be a member of a team once."""
-        TeamMember.objects.create(
-            team=team, user_id=mock_user_data["user_id"], role="developer"
-        )
+        TeamMember.objects.create(team=team, user_id=mock_user_data["user_id"], role="developer")
 
         # Attempting to add the same user again should fail
         with pytest.raises(IntegrityError):
-            TeamMember.objects.create(
-                team=team, user_id=mock_user_data["user_id"], role="lead"
-            )
+            TeamMember.objects.create(team=team, user_id=mock_user_data["user_id"], role="lead")
 
     def test_team_member_role_choices(self, team, mock_user_data):
         """Test valid role choices."""
@@ -149,9 +147,7 @@ class TestTeamMemberModel:
         ]
 
         for role in valid_roles:
-            member = TeamMember.objects.create(
-                team=team, user_id=uuid.uuid4(), role=role
-            )
+            member = TeamMember.objects.create(team=team, user_id=uuid.uuid4(), role=role)
             assert member.role == role
 
     def test_default_role(self, team, mock_user_data):
@@ -240,7 +236,9 @@ class TestGitHubIntegrationModel:
 
     def test_github_integration_str_representation(self, github_integration):
         """Test GitHub integration string representation."""
-        expected = f"{github_integration.repository_owner}/{github_integration.repository_name} - {github_integration.project.name}"
+        expected = (
+            f"{github_integration.repository_owner}/{github_integration.repository_name} - {github_integration.project.name}"
+        )
         assert str(github_integration) == expected
 
     def test_github_integration_repository_url_property(self, github_integration):

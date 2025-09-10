@@ -119,13 +119,9 @@ def readiness_check(request):
         if DatabaseHealthCheck.is_healthy(use_cache=True):
             return Response({"status": "ready"}, status=status.HTTP_200_OK)
         else:
-            return Response(
-                {"status": "not ready"}, status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
+            return Response({"status": "not ready"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
     except Exception:
-        return Response(
-            {"status": "not ready"}, status=status.HTTP_503_SERVICE_UNAVAILABLE
-        )
+        return Response({"status": "not ready"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
 
 @extend_schema(

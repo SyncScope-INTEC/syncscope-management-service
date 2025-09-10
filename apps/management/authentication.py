@@ -81,9 +81,7 @@ class RemoteJWTAuthentication(BaseAuthentication):
         """
         Validate the JWT token with the remote auth service.
         """
-        auth_service_url = getattr(
-            settings, "AUTH_SERVICE_URL", "http://localhost:8000"
-        )
+        auth_service_url = getattr(settings, "AUTH_SERVICE_URL", "http://localhost:8000")
         verify_url = f"{auth_service_url}/auth/verify-token/"
 
         try:
@@ -99,9 +97,7 @@ class RemoteJWTAuthentication(BaseAuthentication):
                 if data.get("valid"):
                     return data
                 else:
-                    logger.warning(
-                        f"Token validation failed: {data.get('error', 'Unknown error')}"
-                    )
+                    logger.warning(f"Token validation failed: {data.get('error', 'Unknown error')}")
                     return None
             else:
                 logger.error(f"Auth service returned status {response.status_code}")
@@ -128,9 +124,7 @@ class AuthServiceIntegration:
         """
         Fetch user details from the auth service.
         """
-        auth_service_url = getattr(
-            settings, "AUTH_SERVICE_URL", "http://localhost:8000"
-        )
+        auth_service_url = getattr(settings, "AUTH_SERVICE_URL", "http://localhost:8000")
         user_url = f"{auth_service_url}/auth/profile/"
 
         headers = {"Content-Type": "application/json"}

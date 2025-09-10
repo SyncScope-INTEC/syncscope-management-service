@@ -33,9 +33,7 @@ class DatabaseRetryConfig:
 
 def exponential_backoff(attempt):
     """Calculate exponential backoff delay"""
-    delay = DatabaseRetryConfig.INITIAL_DELAY * (
-        DatabaseRetryConfig.BACKOFF_MULTIPLIER**attempt
-    )
+    delay = DatabaseRetryConfig.INITIAL_DELAY * (DatabaseRetryConfig.BACKOFF_MULTIPLIER**attempt)
     return min(delay, DatabaseRetryConfig.MAX_DELAY)
 
 
@@ -95,9 +93,7 @@ def database_retry(max_retries=None, log_attempts=True):
 
                     if not is_retryable_error(e) or attempt == max_retries:
                         if log_attempts:
-                            logger.error(
-                                f"Database operation failed after {attempt + 1} attempts: {e}"
-                            )
+                            logger.error(f"Database operation failed after {attempt + 1} attempts: {e}")
                         raise e
 
                     delay = exponential_backoff(attempt)
