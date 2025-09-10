@@ -20,7 +20,9 @@ ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1").split(","
 
 # Add Railway health check domain
 if "RAILWAY_ENVIRONMENT" in os.environ:
-    ALLOWED_HOSTS.extend(["healthcheck.railway.app", "*.railway.app", "*.up.railway.app"])
+    ALLOWED_HOSTS.extend(
+        ["healthcheck.railway.app", "*.railway.app", "*.up.railway.app"]
+    )
 
     # Add the specific Railway service domain if provided
     railway_public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
@@ -130,7 +132,8 @@ if not USE_SQLITE:
     # This management service works primarily with the management schema
     # But also needs access to other schemas for relationships
     use_management_schema = (
-        "test" not in config("DB_NAME", default="").lower() and "test" not in os.environ.get("DATABASE_URL", "").lower()
+        "test" not in config("DB_NAME", default="").lower()
+        and "test" not in os.environ.get("DATABASE_URL", "").lower()
     )
 
     if use_management_schema:
@@ -142,7 +145,11 @@ if not USE_SQLITE:
         db_options["options"] = "-c statement_timeout=30000"
 
     DATABASES["default"].update(
-        {"CONN_MAX_AGE": 0, "CONN_HEALTH_CHECKS": True, "OPTIONS": db_options}  # Don't persist connections in serverless
+        {
+            "CONN_MAX_AGE": 0,
+            "CONN_HEALTH_CHECKS": True,
+            "OPTIONS": db_options,
+        }  # Don't persist connections in serverless
     )
 
 # Use default User model - management service integrates with auth service
@@ -187,7 +194,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # REST Framework configuration
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": ("apps.management.authentication.RemoteJWTAuthentication",),
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "apps.management.authentication.RemoteJWTAuthentication",
+    ),
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
@@ -224,16 +233,22 @@ SIMPLE_JWT = {
 }
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="http://localhost:3000,http://127.0.0.1:3000").split(",")
+CORS_ALLOWED_ORIGINS = config(
+    "CORS_ALLOWED_ORIGINS", default="http://localhost:3000,http://127.0.0.1:3000"
+).split(",")
 
 CORS_ALLOW_CREDENTIALS = True
 
 # CSRF settings
-CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="http://localhost:3000,http://127.0.0.1:3000").split(",")
+CSRF_TRUSTED_ORIGINS = config(
+    "CSRF_TRUSTED_ORIGINS", default="http://localhost:3000,http://127.0.0.1:3000"
+).split(",")
 
 # Service URLs
 AUTH_SERVICE_URL = config("AUTH_SERVICE_URL", default="http://localhost:8000")
-MONITORING_SERVICE_URL = config("MONITORING_SERVICE_URL", default="http://localhost:8001")
+MONITORING_SERVICE_URL = config(
+    "MONITORING_SERVICE_URL", default="http://localhost:8001"
+)
 ANALYTICS_SERVICE_URL = config("ANALYTICS_SERVICE_URL", default="http://localhost:8003")
 
 # Security settings
@@ -336,7 +351,10 @@ SPECTACULAR_SETTINGS = {
     },
     "SERVERS": [
         {"url": "http://localhost:8002", "description": "Local development server"},
-        {"url": "https://syncscope-management-service-dev.up.railway.app", "description": "Development server"},
+        {
+            "url": "https://syncscope-management-service-dev.up.railway.app",
+            "description": "Development server",
+        },
     ],
     # Better component handling
     "COMPONENT_SPLIT_PATCH": True,

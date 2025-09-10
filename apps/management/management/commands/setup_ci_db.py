@@ -48,7 +48,9 @@ class Command(BaseCommand):
                         self.run_migrations()
             except Exception as e:
                 self.stdout.write(self.style.WARNING(f"Auth schema setup failed: {e}"))
-                self.stdout.write(self.style.WARNING("Falling back to public schema for CI..."))
+                self.stdout.write(
+                    self.style.WARNING("Falling back to public schema for CI...")
+                )
                 self.setup_public_schema_ci()
 
         # Check if database connection works
@@ -57,7 +59,9 @@ class Command(BaseCommand):
         # Verify tables exist
         self.verify_required_tables()
 
-        self.stdout.write(self.style.SUCCESS("✓ Database setup completed for CI environment"))
+        self.stdout.write(
+            self.style.SUCCESS("✓ Database setup completed for CI environment")
+        )
 
     def show_database_config(self):
         """Show current database configuration"""
@@ -76,7 +80,9 @@ class Command(BaseCommand):
             if "search_path=auth" in options["options"]:
                 self.stdout.write(self.style.WARNING("  ⚠️  Using auth schema"))
             else:
-                self.stdout.write(self.style.SUCCESS("  ✓ Using public schema (recommended for CI)"))
+                self.stdout.write(
+                    self.style.SUCCESS("  ✓ Using public schema (recommended for CI)")
+                )
         else:
             self.stdout.write("  - No PostgreSQL options set")
 
@@ -92,12 +98,18 @@ class Command(BaseCommand):
                 # Create auth schema if it doesn't exist
                 cursor.execute("CREATE SCHEMA IF NOT EXISTS auth;")
 
-            self.stdout.write(self.style.SUCCESS("✓ Auth schema created or already exists"))
+            self.stdout.write(
+                self.style.SUCCESS("✓ Auth schema created or already exists")
+            )
 
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"❌ Error creating auth schema: {e}"))
             # Don't raise in CI environments, just warn
-            self.stdout.write(self.style.WARNING("⚠️  Continuing without auth schema (using public schema)"))
+            self.stdout.write(
+                self.style.WARNING(
+                    "⚠️  Continuing without auth schema (using public schema)"
+                )
+            )
 
     def check_database_connection(self):
         """Check if database connection works"""
@@ -108,7 +120,9 @@ class Command(BaseCommand):
                 cursor.execute("SELECT 1")
                 result = cursor.fetchone()
                 if result[0] == 1:
-                    self.stdout.write(self.style.SUCCESS("✓ Database connection successful"))
+                    self.stdout.write(
+                        self.style.SUCCESS("✓ Database connection successful")
+                    )
                 else:
                     raise Exception("Unexpected result from test query")
 
@@ -149,14 +163,18 @@ class Command(BaseCommand):
             if "OPTIONS" in db_config and "options" in db_config["OPTIONS"]:
                 original_options = db_config["OPTIONS"]["options"]
                 # Remove auth schema setting for CI
-                db_config["OPTIONS"]["options"] = original_options.replace("-c search_path=auth", "")
+                db_config["OPTIONS"]["options"] = original_options.replace(
+                    "-c search_path=auth", ""
+                )
                 self.stdout.write("✓ Temporarily switched to public schema for CI")
 
             # Run migrations in public schema
             self.run_migrations()
 
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"❌ Failed to setup public schema: {e}"))
+            self.stdout.write(
+                self.style.ERROR(f"❌ Failed to setup public schema: {e}")
+            )
             raise
 
     def run_migrations(self):
@@ -191,7 +209,9 @@ class Command(BaseCommand):
                 )
                 existing_tables = [row[0] for row in cursor.fetchall()]
 
-                self.stdout.write(f"📋 Found {len(existing_tables)} tables in current schema")
+                self.stdout.write(
+                    f"📋 Found {len(existing_tables)} tables in current schema"
+                )
 
                 missing_tables = []
                 for table in required_tables:
@@ -207,9 +227,13 @@ class Command(BaseCommand):
                             f"⚠️  {len(missing_tables)} required tables are missing: {', '.join(missing_tables)}"
                         )
                     )
-                    self.stdout.write("💡 Consider running migrations or checking schema configuration")
+                    self.stdout.write(
+                        "💡 Consider running migrations or checking schema configuration"
+                    )
                 else:
-                    self.stdout.write(self.style.SUCCESS("✅ All required tables found"))
+                    self.stdout.write(
+                        self.style.SUCCESS("✅ All required tables found")
+                    )
 
         except Exception as e:
             self.stdout.write(self.style.WARNING(f"⚠️  Could not verify tables: {e}"))

@@ -98,8 +98,14 @@ def health_check(request):
     summary="Readiness check endpoint",
     description="Check if the service is ready to accept requests.",
     responses={
-        200: {"type": "object", "properties": {"status": {"type": "string", "example": "ready"}}},
-        503: {"type": "object", "properties": {"status": {"type": "string", "example": "not ready"}}},
+        200: {
+            "type": "object",
+            "properties": {"status": {"type": "string", "example": "ready"}},
+        },
+        503: {
+            "type": "object",
+            "properties": {"status": {"type": "string", "example": "not ready"}},
+        },
     },
 )
 @api_view(["GET"])
@@ -113,16 +119,25 @@ def readiness_check(request):
         if DatabaseHealthCheck.is_healthy(use_cache=True):
             return Response({"status": "ready"}, status=status.HTTP_200_OK)
         else:
-            return Response({"status": "not ready"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            return Response(
+                {"status": "not ready"}, status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
     except Exception:
-        return Response({"status": "not ready"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response(
+            {"status": "not ready"}, status=status.HTTP_503_SERVICE_UNAVAILABLE
+        )
 
 
 @extend_schema(
     tags=["Health"],
     summary="Liveness check endpoint",
     description="Check if the service is alive (basic endpoint for load balancers).",
-    responses={200: {"type": "object", "properties": {"status": {"type": "string", "example": "alive"}}}},
+    responses={
+        200: {
+            "type": "object",
+            "properties": {"status": {"type": "string", "example": "alive"}},
+        }
+    },
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])

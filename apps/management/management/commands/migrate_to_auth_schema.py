@@ -20,7 +20,9 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
 
         if dry_run:
-            self.stdout.write(self.style.WARNING("DRY RUN MODE - No changes will be made"))
+            self.stdout.write(
+                self.style.WARNING("DRY RUN MODE - No changes will be made")
+            )
 
         with connection.cursor() as cursor:
             # First, ensure auth schema exists
@@ -56,7 +58,9 @@ class Command(BaseCommand):
             # If authentication_user exists in public but users exists in auth,
             # we need to update django_migrations table
             if "authentication_user" in public_tables and "users" in auth_tables:
-                self.stdout.write("Updating Django migrations to point to auth schema...")
+                self.stdout.write(
+                    "Updating Django migrations to point to auth schema..."
+                )
                 if not dry_run:
                     cursor.execute("SET search_path TO auth, public;")
                     # Update the django_migrations table to reflect we're using auth schema
@@ -94,7 +98,9 @@ class Command(BaseCommand):
                     constraints = cursor.fetchall()
 
                     for constraint_name, table_name in constraints:
-                        cursor.execute(f"ALTER TABLE {table_name} DROP CONSTRAINT IF EXISTS {constraint_name};")
+                        cursor.execute(
+                            f"ALTER TABLE {table_name} DROP CONSTRAINT IF EXISTS {constraint_name};"
+                        )
 
                     cursor.execute(f"DROP TABLE IF EXISTS public.{table} CASCADE;")
                 else:
@@ -105,4 +111,6 @@ class Command(BaseCommand):
                 self.stdout.write("Updating User model to use auth.users table...")
                 # This will be handled in the model update
 
-            self.stdout.write(self.style.SUCCESS("Migration to auth schema completed successfully!"))
+            self.stdout.write(
+                self.style.SUCCESS("Migration to auth schema completed successfully!")
+            )

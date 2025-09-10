@@ -6,13 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('authentication', '0001_initial'),
+        ("authentication", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='user',
-            name='profile_image_path',
-            field=models.CharField(max_length=500, null=True, blank=True, help_text='Path to user profile image stored in Railway volume'),
+            model_name="user",
+            name="profile_image_path",
+            field=models.CharField(
+                max_length=500,
+                null=True,
+                blank=True,
+                help_text="Path to user profile image stored in Railway volume",
+            ),
         ),
     ]

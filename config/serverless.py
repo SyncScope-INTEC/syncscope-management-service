@@ -30,7 +30,9 @@ def setup_serverless_environment():
     if hasattr(settings, "SIMPLE_JWT"):
         settings.SIMPLE_JWT.update(
             {
-                "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),  # Shorter for serverless
+                "ACCESS_TOKEN_LIFETIME": timedelta(
+                    minutes=15
+                ),  # Shorter for serverless
                 "REFRESH_TOKEN_LIFETIME": timedelta(hours=1),  # Shorter refresh window
             }
         )

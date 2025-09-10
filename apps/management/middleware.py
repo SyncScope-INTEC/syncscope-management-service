@@ -27,11 +27,15 @@ class SecurityHeadersMiddleware:
 
         # HSTS for HTTPS
         if request.is_secure():
-            response["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+            response["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
 
         # CSP for API responses
         if request.path.startswith("/auth/"):
-            response["Content-Security-Policy"] = "default-src 'none'; script-src 'none'; object-src 'none'"
+            response["Content-Security-Policy"] = (
+                "default-src 'none'; script-src 'none'; object-src 'none'"
+            )
 
         return response
 
@@ -51,7 +55,9 @@ class RateLimitMiddleware(MiddlewareMixin):
         ip = self.get_client_ip(request)
 
         # Different rate limits for different endpoints
-        if request.path.startswith("/auth/login") or request.path.startswith("/auth/register"):
+        if request.path.startswith("/auth/login") or request.path.startswith(
+            "/auth/register"
+        ):
             limit = 5  # 5 requests per minute for login/register
             window = 60
         elif request.path.startswith("/auth/"):
@@ -68,14 +74,22 @@ class RateLimitMiddleware(MiddlewareMixin):
 
         if current_count >= limit:
             return JsonResponse(
-                {"error": "Rate limit exceeded", "detail": f"Too many requests. Limit: {limit}/{window}s"}, status=429
+                {
+                    "error": "Rate limit exceeded",
+                    "detail": f"Too many requests. Limit: {limit}/{window}s",
+                },
+                status=429,
             )
 
         # Increment counter
         cache.set(cache_key, current_count + 1, window)
 
         # Store rate limit info for response headers
-        request._rate_limit_info = {"limit": limit, "remaining": max(0, limit - current_count - 1), "reset": window}
+        request._rate_limit_info = {
+            "limit": limit,
+            "remaining": max(0, limit - current_count - 1),
+            "reset": window,
+        }
 
         return None
 
@@ -106,7 +120,9 @@ class RequestLoggingMiddleware:
         start_time = time.time()
 
         # Log request
-        logger.info(f"Request: {request.method} {request.path} from {self.get_client_ip(request)}")
+        logger.info(
+            f"Request: {request.method} {request.path} from {self.get_client_ip(request)}"
+        )
 
         response = self.get_response(request)
 
@@ -142,7 +158,11 @@ class CorsMiddleware:
             if origin in allowed_origins:
                 response["Access-Control-Allow-Origin"] = origin
                 response["Access-Control-Allow-Credentials"] = "true"
-                response["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-                response["Access-Control-Allow-Headers"] = "Authorization, Content-Type, X-Requested-With"
+                response["Access-Control-Allow-Methods"] = (
+                    "GET, POST, PUT, DELETE, OPTIONS"
+                )
+                response["Access-Control-Allow-Headers"] = (
+                    "Authorization, Content-Type, X-Requested-With"
+                )
 
         return response

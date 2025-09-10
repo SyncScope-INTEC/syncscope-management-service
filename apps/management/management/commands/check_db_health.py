@@ -36,21 +36,33 @@ class Command(BaseCommand):
                 is_healthy = DatabaseHealthCheck.is_healthy(use_cache=use_cache)
 
                 if is_healthy:
-                    self.stdout.write(self.style.SUCCESS(f"✓ Database is healthy (attempt {attempt + 1})"))
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"✓ Database is healthy (attempt {attempt + 1})"
+                        )
+                    )
                     sys.exit(0)
                 else:
                     self.stdout.write(
-                        self.style.WARNING(f"⚠ Database health check failed (attempt {attempt + 1}/{retry_count})")
+                        self.style.WARNING(
+                            f"⚠ Database health check failed (attempt {attempt + 1}/{retry_count})"
+                        )
                     )
 
                     if attempt < retry_count - 1:
                         self.stdout.write("Retrying...")
 
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"❌ Database health check error (attempt {attempt + 1}): {e}"))
+                self.stdout.write(
+                    self.style.ERROR(
+                        f"❌ Database health check error (attempt {attempt + 1}): {e}"
+                    )
+                )
 
                 if attempt < retry_count - 1:
                     self.stdout.write("Retrying...")
 
-        self.stdout.write(self.style.ERROR(f"❌ Database is unhealthy after {retry_count} attempts"))
+        self.stdout.write(
+            self.style.ERROR(f"❌ Database is unhealthy after {retry_count} attempts")
+        )
         sys.exit(1)

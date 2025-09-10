@@ -71,4 +71,6 @@ def create_auth_schema_if_not_exists():
 
     except Exception as e:
         print(f"Warning: Could not create auth schema: {e}")
-        print("Make sure to create the 'auth' schema manually in your PostgreSQL database")
+        print(
+            "Make sure to create the 'auth' schema manually in your PostgreSQL database"
+        )

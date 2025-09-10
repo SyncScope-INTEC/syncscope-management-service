@@ -3,7 +3,8 @@ from rest_framework import serializers
 from config.database_retry import database_retry
 
 from .authentication import AuthServiceIntegration
-from .models import CodeCommit, GitHubIntegration, Integration, Project, Team, TeamMember
+from .models import (CodeCommit, GitHubIntegration, Integration, Project, Team,
+                     TeamMember)
 
 
 class TeamSerializer(serializers.ModelSerializer):
@@ -11,7 +12,15 @@ class TeamSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Team
-        fields = ["id", "name", "description", "company_id", "created_by", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "name",
+            "description",
+            "company_id",
+            "created_by",
+            "created_at",
+            "updated_at",
+        ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs):
@@ -54,7 +63,17 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ["id", "name", "description", "team", "team_name", "repository_url", "url", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "name",
+            "description",
+            "team",
+            "team_name",
+            "repository_url",
+            "url",
+            "created_at",
+            "updated_at",
+        ]
         read_only_fields = ["id", "team_name", "created_at", "updated_at"]
 
     def validate_team(self, value):
@@ -64,12 +83,16 @@ class ProjectSerializer(serializers.ModelSerializer):
             # Check if user belongs to the team or is admin
             if hasattr(user, "role") and user.role == "admin":
                 return value
-            
+
             # Check if user is a member of the team
             if hasattr(user, "id"):
-                is_member = TeamMember.objects.filter(team=value, user_id=user.id).exists()
+                is_member = TeamMember.objects.filter(
+                    team=value, user_id=user.id
+                ).exists()
                 if not is_member:
-                    raise serializers.ValidationError("You don't have permission to create projects for this team.")
+                    raise serializers.ValidationError(
+                        "You don't have permission to create projects for this team."
+                    )
         return value
 
 
@@ -81,7 +104,11 @@ class ProjectDetailSerializer(ProjectSerializer):
     latest_commit = serializers.SerializerMethodField()
 
     class Meta(ProjectSerializer.Meta):
-        fields = ProjectSerializer.Meta.fields + ["integrations_count", "commits_count", "latest_commit"]
+        fields = ProjectSerializer.Meta.fields + [
+            "integrations_count",
+            "commits_count",
+            "latest_commit",
+        ]
 
     def get_integrations_count(self, obj):
         return obj.integrations.filter(is_active=True).count()
@@ -110,8 +137,26 @@ class TeamMemberSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TeamMember
-        fields = ["id", "team", "team_name", "user_id", "user_email", "user_name", "role", "joined_at", "created_at", "updated_at"]
-        read_only_fields = ["id", "team_name", "user_email", "user_name", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "team",
+            "team_name",
+            "user_id",
+            "user_email",
+            "user_name",
+            "role",
+            "joined_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "team_name",
+            "user_email",
+            "user_name",
+            "created_at",
+            "updated_at",
+        ]
 
     def get_user_email(self, obj):
         """Get user email from auth service."""
@@ -150,7 +195,9 @@ class TeamMemberSerializer(serializers.ModelSerializer):
                     team=team, user_id=requesting_user.id, role="lead"
                 ).first()
                 if not requesting_member:
-                    raise serializers.ValidationError("You don't have permission to add members to this team.")
+                    raise serializers.ValidationError(
+                        "You don't have permission to add members to this team."
+                    )
 
         return attrs
 
@@ -162,24 +209,37 @@ class IntegrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Integration
-        fields = ["id", "project", "project_name", "type", "config_data", "is_active", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "project",
+            "project_name",
+            "type",
+            "config_data",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
         read_only_fields = ["id", "project_name", "created_at", "updated_at"]
 
     def validate_config_data(self, value):
         """Validate config data based on integration type."""
         integration_type = self.initial_data.get("type")
-        
+
         if integration_type == "github":
             required_fields = ["repository_owner", "repository_name"]
             for field in required_fields:
                 if field not in value:
-                    raise serializers.ValidationError(f"GitHub integration requires '{field}' in config_data.")
-        
+                    raise serializers.ValidationError(
+                        f"GitHub integration requires '{field}' in config_data."
+                    )
+
         elif integration_type == "slack":
             required_fields = ["webhook_url"]
             for field in required_fields:
                 if field not in value:
-                    raise serializers.ValidationError(f"Slack integration requires '{field}' in config_data.")
+                    raise serializers.ValidationError(
+                        f"Slack integration requires '{field}' in config_data."
+                    )
 
         return value
 
@@ -204,7 +264,14 @@ class GitHubIntegrationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "project_name", "repository_url", "last_sync", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "project_name",
+            "repository_url",
+            "last_sync",
+            "created_at",
+            "updated_at",
+        ]
 
     def validate(self, attrs):
         """Validate GitHub integration data."""
@@ -214,9 +281,13 @@ class GitHubIntegrationSerializer(serializers.ModelSerializer):
 
         # Check if this repository is already integrated with the project
         if GitHubIntegration.objects.filter(
-            project=project, repository_owner=repository_owner, repository_name=repository_name
+            project=project,
+            repository_owner=repository_owner,
+            repository_name=repository_name,
         ).exists():
-            raise serializers.ValidationError("This repository is already integrated with the project.")
+            raise serializers.ValidationError(
+                "This repository is already integrated with the project."
+            )
 
         return attrs
 
@@ -250,28 +321,39 @@ class CodeCommitSerializer(serializers.ModelSerializer):
 
 # Request/Response Serializers for API endpoints
 
+
 class TeamCreateSerializer(serializers.Serializer):
     """Serializer for team creation requests."""
 
     name = serializers.CharField(max_length=255, help_text="Team name")
-    description = serializers.CharField(required=False, allow_blank=True, help_text="Team description")
+    description = serializers.CharField(
+        required=False, allow_blank=True, help_text="Team description"
+    )
 
 
 class TeamUpdateSerializer(serializers.Serializer):
     """Serializer for team update requests."""
 
     name = serializers.CharField(max_length=255, required=False, help_text="Team name")
-    description = serializers.CharField(required=False, allow_blank=True, help_text="Team description")
+    description = serializers.CharField(
+        required=False, allow_blank=True, help_text="Team description"
+    )
 
 
 class ProjectCreateSerializer(serializers.Serializer):
     """Serializer for project creation requests."""
 
     name = serializers.CharField(max_length=255, help_text="Project name")
-    description = serializers.CharField(required=False, allow_blank=True, help_text="Project description")
+    description = serializers.CharField(
+        required=False, allow_blank=True, help_text="Project description"
+    )
     team_id = serializers.UUIDField(help_text="Team ID")
-    repository_url = serializers.URLField(required=False, allow_blank=True, help_text="Repository URL")
-    url = serializers.URLField(required=False, allow_blank=True, help_text="Project URL")
+    repository_url = serializers.URLField(
+        required=False, allow_blank=True, help_text="Repository URL"
+    )
+    url = serializers.URLField(
+        required=False, allow_blank=True, help_text="Project URL"
+    )
 
 
 class TeamMemberCreateSerializer(serializers.Serializer):
@@ -281,7 +363,7 @@ class TeamMemberCreateSerializer(serializers.Serializer):
     role = serializers.ChoiceField(
         choices=TeamMember.ROLE_CHOICES,
         default="developer",
-        help_text="Role in the team"
+        help_text="Role in the team",
     )
 
 
@@ -289,7 +371,9 @@ class IntegrationCreateSerializer(serializers.Serializer):
     """Serializer for creating integrations."""
 
     project_id = serializers.UUIDField(help_text="Project ID")
-    type = serializers.ChoiceField(choices=Integration.INTEGRATION_TYPE_CHOICES, help_text="Integration type")
+    type = serializers.ChoiceField(
+        choices=Integration.INTEGRATION_TYPE_CHOICES, help_text="Integration type"
+    )
     config_data = serializers.JSONField(help_text="Integration configuration data")
 
 

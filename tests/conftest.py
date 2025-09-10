@@ -14,7 +14,8 @@ if not settings.configured:
 from rest_framework.test import APIClient
 
 from apps.management.authentication import RemoteUserProxy
-from apps.management.models import CodeCommit, GitHubIntegration, Integration, Project, Team, TeamMember
+from apps.management.models import (CodeCommit, GitHubIntegration, Integration,
+                                    Project, Team, TeamMember)
 
 
 @pytest.fixture
@@ -25,8 +26,9 @@ def api_client():
 @pytest.fixture
 def mock_auth_service():
     """Mock the auth service responses for testing."""
-    with patch("apps.management.authentication.requests.post") as mock_post, \
-         patch("apps.management.authentication.requests.get") as mock_get:
+    with patch("apps.management.authentication.requests.post") as mock_post, patch(
+        "apps.management.authentication.requests.get"
+    ) as mock_get:
         # Mock token validation response
         mock_post.return_value.status_code = 200
         mock_post.return_value.json.return_value = {
@@ -36,9 +38,9 @@ def mock_auth_service():
             "role": "developer",
             "company_id": str(uuid.uuid4()),
             "first_name": "Test",
-            "last_name": "User"
+            "last_name": "User",
         }
-        
+
         # Mock user data response
         mock_get.return_value.status_code = 200
         mock_get.return_value.json.return_value = {
@@ -47,9 +49,9 @@ def mock_auth_service():
             "role": "developer",
             "company_id": str(uuid.uuid4()),
             "first_name": "Test",
-            "last_name": "User"
+            "last_name": "User",
         }
-        
+
         yield mock_post, mock_get
 
 
@@ -62,7 +64,7 @@ def mock_user_data():
         "role": "developer",
         "company_id": str(uuid.uuid4()),
         "first_name": "Test",
-        "last_name": "User"
+        "last_name": "User",
     }
 
 
@@ -75,7 +77,7 @@ def mock_admin_user_data():
         "role": "admin",
         "company_id": str(uuid.uuid4()),
         "first_name": "Admin",
-        "last_name": "User"
+        "last_name": "User",
     }
 
 
@@ -110,9 +112,9 @@ def admin_authenticated_client(api_client, mock_auth_service):
         "role": "admin",
         "company_id": str(uuid.uuid4()),
         "first_name": "Admin",
-        "last_name": "User"
+        "last_name": "User",
     }
-    
+
     api_client.credentials(HTTP_AUTHORIZATION="Bearer admin-jwt-token")
     return api_client
 
@@ -130,7 +132,7 @@ def team(company_id, mock_user_data):
         name="Test Team",
         description="A test team for testing purposes",
         company_id=company_id,
-        created_by=mock_user_data["user_id"]
+        created_by=mock_user_data["user_id"],
     )
 
 
@@ -138,9 +140,7 @@ def team(company_id, mock_user_data):
 def team_with_lead(team, mock_user_data):
     """Create a team with a team lead member."""
     member = TeamMember.objects.create(
-        team=team,
-        user_id=mock_user_data["user_id"],
-        role="lead"
+        team=team, user_id=mock_user_data["user_id"], role="lead"
     )
     return team, member
 
@@ -153,7 +153,7 @@ def project(team):
         description="A test project for testing purposes",
         team=team,
         repository_url="https://github.com/testuser/test-repo",
-        url="https://testproject.com"
+        url="https://testproject.com",
     )
 
 
@@ -161,9 +161,7 @@ def project(team):
 def team_member(team, mock_user_data):
     """Create a test team member."""
     return TeamMember.objects.create(
-        team=team,
-        user_id=mock_user_data["user_id"],
-        role="developer"
+        team=team, user_id=mock_user_data["user_id"], role="developer"
     )
 
 
@@ -171,9 +169,7 @@ def team_member(team, mock_user_data):
 def team_lead(team, mock_user_data):
     """Create a test team lead."""
     return TeamMember.objects.create(
-        team=team,
-        user_id=mock_user_data["user_id"],
-        role="lead"
+        team=team, user_id=mock_user_data["user_id"], role="lead"
     )
 
 
@@ -183,11 +179,8 @@ def integration(project):
     return Integration.objects.create(
         project=project,
         type="github",
-        config_data={
-            "repository_owner": "testuser",
-            "repository_name": "test-repo"
-        },
-        is_active=True
+        config_data={"repository_owner": "testuser", "repository_name": "test-repo"},
+        is_active=True,
     )
 
 
@@ -199,7 +192,7 @@ def github_integration(project):
         repository_owner="testuser",
         repository_name="test-repo",
         access_token="test-access-token",
-        is_active=True
+        is_active=True,
     )
 
 
@@ -216,7 +209,7 @@ def code_commit(project):
         timestamp="2023-01-01T12:00:00Z",
         files_changed=3,
         insertions=25,
-        deletions=10
+        deletions=10,
     )
 
 
@@ -224,18 +217,9 @@ def code_commit(project):
 def sample_teams_data():
     """Sample data for creating multiple teams."""
     return [
-        {
-            "name": "Frontend Team",
-            "description": "Frontend development team"
-        },
-        {
-            "name": "Backend Team", 
-            "description": "Backend development team"
-        },
-        {
-            "name": "DevOps Team",
-            "description": "DevOps and infrastructure team"
-        }
+        {"name": "Frontend Team", "description": "Frontend development team"},
+        {"name": "Backend Team", "description": "Backend development team"},
+        {"name": "DevOps Team", "description": "DevOps and infrastructure team"},
     ]
 
 
@@ -247,16 +231,16 @@ def sample_projects_data():
             "name": "Frontend App",
             "description": "Main frontend application",
             "repository_url": "https://github.com/company/frontend-app",
-            "url": "https://app.company.com"
+            "url": "https://app.company.com",
         },
         {
             "name": "API Service",
             "description": "Main backend API service",
-            "repository_url": "https://github.com/company/api-service"
+            "repository_url": "https://github.com/company/api-service",
         },
         {
             "name": "Mobile App",
             "description": "Mobile application",
-            "repository_url": "https://github.com/company/mobile-app"
-        }
+            "repository_url": "https://github.com/company/mobile-app",
+        },
     ]

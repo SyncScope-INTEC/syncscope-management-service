@@ -1,27 +1,29 @@
-import pytest
 import uuid
 from datetime import timedelta
+
+import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.utils import timezone
 
-from apps.management.models import CodeCommit, GitHubIntegration, Integration, Project, Team, TeamMember
+from apps.management.models import (CodeCommit, GitHubIntegration, Integration,
+                                    Project, Team, TeamMember)
 
 
 @pytest.mark.django_db
 class TestTeamModel:
-    
+
     def test_create_team_success(self, company_id, mock_user_data):
         """Test successful team creation."""
         team = Team.objects.create(
             name="Test Team",
             description="Test Description",
             company_id=company_id,
-            created_by=mock_user_data["user_id"]
+            created_by=mock_user_data["user_id"],
         )
-        
+
         assert team.name == "Test Team"
-        assert team.description == "Test Description" 
+        assert team.description == "Test Description"
         assert team.company_id == company_id
         assert team.created_by == mock_user_data["user_id"]
         assert team.id is not None
@@ -37,15 +39,15 @@ class TestTeamModel:
         team1 = Team.objects.create(
             name="First Team",
             company_id=company_id,
-            created_by=mock_user_data["user_id"]
+            created_by=mock_user_data["user_id"],
         )
-        
+
         team2 = Team.objects.create(
-            name="Second Team", 
+            name="Second Team",
             company_id=company_id,
-            created_by=mock_user_data["user_id"]
+            created_by=mock_user_data["user_id"],
         )
-        
+
         teams = list(Team.objects.all())
         assert teams[0] == team2  # Newest first
         assert teams[1] == team1
@@ -56,9 +58,9 @@ class TestTeamModel:
             Team.objects.create(name="Test Team")  # Missing required fields
 
 
-@pytest.mark.django_db  
+@pytest.mark.django_db
 class TestProjectModel:
-    
+
     def test_create_project_success(self, team):
         """Test successful project creation."""
         project = Project.objects.create(
@@ -66,9 +68,9 @@ class TestProjectModel:
             description="Test Description",
             team=team,
             repository_url="https://github.com/test/repo",
-            url="https://test.com"
+            url="https://test.com",
         )
-        
+
         assert project.name == "Test Project"
         assert project.description == "Test Description"
         assert project.team == team
@@ -85,36 +87,28 @@ class TestProjectModel:
 
     def test_project_team_relationship(self, team):
         """Test project-team relationship."""
-        project = Project.objects.create(
-            name="Test Project",
-            team=team
-        )
-        
+        project = Project.objects.create(name="Test Project", team=team)
+
         assert project.team == team
         assert project in team.projects.all()
 
     def test_project_cascade_delete(self, team):
         """Test that projects are deleted when team is deleted."""
-        project = Project.objects.create(
-            name="Test Project",
-            team=team
-        )
-        
+        project = Project.objects.create(name="Test Project", team=team)
+
         team.delete()
         assert not Project.objects.filter(id=project.id).exists()
 
 
 @pytest.mark.django_db
 class TestTeamMemberModel:
-    
+
     def test_create_team_member_success(self, team, mock_user_data):
         """Test successful team member creation."""
         member = TeamMember.objects.create(
-            team=team,
-            user_id=mock_user_data["user_id"],
-            role="developer"
+            team=team, user_id=mock_user_data["user_id"], role="developer"
         )
-        
+
         assert member.team == team
         assert member.user_id == mock_user_data["user_id"]
         assert member.role == "developer"
@@ -125,59 +119,59 @@ class TestTeamMemberModel:
 
     def test_team_member_str_representation(self, team_member):
         """Test team member string representation."""
-        expected = f"User {team_member.user_id} - {team_member.team.name} ({team_member.role})"
+        expected = (
+            f"User {team_member.user_id} - {team_member.team.name} ({team_member.role})"
+        )
         assert str(team_member) == expected
 
     def test_team_member_unique_constraint(self, team, mock_user_data):
         """Test that a user can only be a member of a team once."""
         TeamMember.objects.create(
-            team=team,
-            user_id=mock_user_data["user_id"],
-            role="developer"
+            team=team, user_id=mock_user_data["user_id"], role="developer"
         )
-        
+
         # Attempting to add the same user again should fail
         with pytest.raises(IntegrityError):
             TeamMember.objects.create(
-                team=team,
-                user_id=mock_user_data["user_id"],
-                role="lead"
+                team=team, user_id=mock_user_data["user_id"], role="lead"
             )
 
     def test_team_member_role_choices(self, team, mock_user_data):
         """Test valid role choices."""
-        valid_roles = ["lead", "developer", "senior_developer", "junior_developer", 
-                      "intern", "designer", "qa"]
-        
+        valid_roles = [
+            "lead",
+            "developer",
+            "senior_developer",
+            "junior_developer",
+            "intern",
+            "designer",
+            "qa",
+        ]
+
         for role in valid_roles:
             member = TeamMember.objects.create(
-                team=team,
-                user_id=uuid.uuid4(),
-                role=role
+                team=team, user_id=uuid.uuid4(), role=role
             )
             assert member.role == role
 
     def test_default_role(self, team, mock_user_data):
         """Test that default role is 'developer'."""
-        member = TeamMember.objects.create(
-            team=team,
-            user_id=mock_user_data["user_id"]
-        )
+        member = TeamMember.objects.create(team=team, user_id=mock_user_data["user_id"])
         assert member.role == "developer"
 
 
 @pytest.mark.django_db
 class TestIntegrationModel:
-    
+
     def test_create_integration_success(self, project):
         """Test successful integration creation."""
         integration = Integration.objects.create(
             project=project,
             type="github",
             config_data={"repo": "test/repo"},
-            is_active=True
+            is_active=True,
         )
-        
+
         assert integration.project == project
         assert integration.type == "github"
         assert integration.config_data == {"repo": "test/repo"}
@@ -193,36 +187,38 @@ class TestIntegrationModel:
 
     def test_integration_default_config_data(self, project):
         """Test that config_data defaults to empty dict."""
-        integration = Integration.objects.create(
-            project=project,
-            type="slack"
-        )
+        integration = Integration.objects.create(project=project, type="slack")
         assert integration.config_data == {}
 
     def test_integration_default_is_active(self, project):
-        """Test that is_active defaults to True.""" 
-        integration = Integration.objects.create(
-            project=project,
-            type="jira"
-        )
+        """Test that is_active defaults to True."""
+        integration = Integration.objects.create(project=project, type="jira")
         assert integration.is_active is True
 
     def test_integration_type_choices(self, project):
         """Test valid integration type choices."""
-        valid_types = ["github", "gitlab", "jira", "slack", "discord", 
-                      "teams", "trello", "asana", "jenkins", "circleci", "custom"]
-        
+        valid_types = [
+            "github",
+            "gitlab",
+            "jira",
+            "slack",
+            "discord",
+            "teams",
+            "trello",
+            "asana",
+            "jenkins",
+            "circleci",
+            "custom",
+        ]
+
         for int_type in valid_types:
-            integration = Integration.objects.create(
-                project=project,
-                type=int_type
-            )
+            integration = Integration.objects.create(project=project, type=int_type)
             assert integration.type == int_type
 
 
 @pytest.mark.django_db
 class TestGitHubIntegrationModel:
-    
+
     def test_create_github_integration_success(self, project):
         """Test successful GitHub integration creation."""
         github_integration = GitHubIntegration.objects.create(
@@ -230,9 +226,9 @@ class TestGitHubIntegrationModel:
             repository_owner="testuser",
             repository_name="test-repo",
             access_token="test-token",
-            is_active=True
+            is_active=True,
         )
-        
+
         assert github_integration.project == project
         assert github_integration.repository_owner == "testuser"
         assert github_integration.repository_name == "test-repo"
@@ -258,16 +254,16 @@ class TestGitHubIntegrationModel:
             project=project,
             repository_owner="testuser",
             repository_name="test-repo",
-            access_token="token1"
+            access_token="token1",
         )
-        
+
         # Creating duplicate should fail
         with pytest.raises(IntegrityError):
             GitHubIntegration.objects.create(
                 project=project,
                 repository_owner="testuser",
                 repository_name="test-repo",
-                access_token="token2"
+                access_token="token2",
             )
 
     def test_github_integration_default_is_active(self, project):
@@ -276,14 +272,14 @@ class TestGitHubIntegrationModel:
             project=project,
             repository_owner="user",
             repository_name="repo",
-            access_token="token"
+            access_token="token",
         )
         assert integration.is_active is True
 
 
 @pytest.mark.django_db
 class TestCodeCommitModel:
-    
+
     def test_create_code_commit_success(self, project):
         """Test successful code commit creation."""
         commit = CodeCommit.objects.create(
@@ -296,9 +292,9 @@ class TestCodeCommitModel:
             timestamp=timezone.now(),
             files_changed=3,
             insertions=25,
-            deletions=10
+            deletions=10,
         )
-        
+
         assert commit.project == project
         assert commit.commit_hash == "abc123def456"
         assert commit.author_email == "dev@example.com"
@@ -329,9 +325,9 @@ class TestCodeCommitModel:
             author_email="dev@example.com",
             author_name="Developer",
             message="First commit",
-            timestamp=timezone.now()
+            timestamp=timezone.now(),
         )
-        
+
         # Creating duplicate should fail
         with pytest.raises(IntegrityError):
             CodeCommit.objects.create(
@@ -340,7 +336,7 @@ class TestCodeCommitModel:
                 author_email="dev2@example.com",
                 author_name="Other Developer",
                 message="Second commit",
-                timestamp=timezone.now()
+                timestamp=timezone.now(),
             )
 
     def test_code_commit_default_values(self, project):
@@ -351,9 +347,9 @@ class TestCodeCommitModel:
             author_email="dev@example.com",
             author_name="Developer",
             message="Test",
-            timestamp=timezone.now()
+            timestamp=timezone.now(),
         )
-        
+
         assert commit.branch == "main"
         assert commit.files_changed == 0
         assert commit.insertions == 0
@@ -362,25 +358,25 @@ class TestCodeCommitModel:
     def test_code_commit_ordering(self, project):
         """Test that commits are ordered by timestamp (newest first)."""
         now = timezone.now()
-        
+
         commit1 = CodeCommit.objects.create(
             project=project,
             commit_hash="first123",
             author_email="dev@example.com",
             author_name="Developer",
             message="First commit",
-            timestamp=now - timedelta(hours=1)
+            timestamp=now - timedelta(hours=1),
         )
-        
+
         commit2 = CodeCommit.objects.create(
             project=project,
             commit_hash="second123",
             author_email="dev@example.com",
-            author_name="Developer", 
+            author_name="Developer",
             message="Second commit",
-            timestamp=now
+            timestamp=now,
         )
-        
+
         commits = list(CodeCommit.objects.all())
         assert commits[0] == commit2  # Newest first
         assert commits[1] == commit1

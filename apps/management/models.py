@@ -61,9 +61,13 @@ class Project(RetryableModelMixin, models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="projects", db_column="team_id")
+    team = models.ForeignKey(
+        Team, on_delete=models.CASCADE, related_name="projects", db_column="team_id"
+    )
     repository_url = models.URLField(max_length=500, null=True, blank=True)
-    url = models.URLField(max_length=500, null=True, blank=True, help_text="Project URL (e.g., live site)")
+    url = models.URLField(
+        max_length=500, null=True, blank=True, help_text="Project URL (e.g., live site)"
+    )
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -103,7 +107,9 @@ class TeamMember(RetryableModelMixin, models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="members", db_column="team_id")
+    team = models.ForeignKey(
+        Team, on_delete=models.CASCADE, related_name="members", db_column="team_id"
+    )
     user_id = models.UUIDField(help_text="Reference to auth.users.id")
     role = models.CharField(max_length=50, choices=ROLE_CHOICES, default="developer")
     joined_at = models.DateTimeField(default=timezone.now)
@@ -151,9 +157,16 @@ class Integration(RetryableModelMixin, models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="integrations", db_column="project_id")
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="integrations",
+        db_column="project_id",
+    )
     type = models.CharField(max_length=50, choices=INTEGRATION_TYPE_CHOICES)
-    config_data = models.JSONField(default=dict, help_text="Integration-specific configuration data")
+    config_data = models.JSONField(
+        default=dict, help_text="Integration-specific configuration data"
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -184,10 +197,17 @@ class GitHubIntegration(RetryableModelMixin, models.Model):
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="github_integrations", db_column="project_id")
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="github_integrations",
+        db_column="project_id",
+    )
     repository_owner = models.CharField(max_length=255)
     repository_name = models.CharField(max_length=255)
-    access_token = models.CharField(max_length=255, help_text="Encrypted GitHub access token")
+    access_token = models.CharField(
+        max_length=255, help_text="Encrypted GitHub access token"
+    )
     webhook_secret = models.CharField(max_length=255, null=True, blank=True)
     is_active = models.BooleanField(default=True)
     last_sync = models.DateTimeField(null=True, blank=True)
@@ -225,7 +245,12 @@ class CodeCommit(RetryableModelMixin, models.Model):
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="commits", db_column="project_id")
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="commits",
+        db_column="project_id",
+    )
     commit_hash = models.CharField(max_length=40)
     author_email = models.EmailField()
     author_name = models.CharField(max_length=255)

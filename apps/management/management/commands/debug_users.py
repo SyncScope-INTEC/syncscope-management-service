@@ -34,7 +34,9 @@ class Command(BaseCommand):
             try:
                 user = User.objects.get(email=test_emails)
                 self.stdout.write(f"✅ Found user: {user}")
-                self.stdout.write(f"Password check available: {hasattr(user, 'check_password')}")
+                self.stdout.write(
+                    f"Password check available: {hasattr(user, 'check_password')}"
+                )
             except User.DoesNotExist:
                 self.stdout.write(f"❌ User with email '{test_emails}' not found")
             except Exception as e:

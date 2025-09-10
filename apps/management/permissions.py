@@ -4,7 +4,7 @@ Custom permission classes for the Management Service.
 
 from rest_framework import permissions
 
-from .models import TeamMember, Project
+from .models import Project, TeamMember
 
 
 class IsOwnerOrAdmin(permissions.BasePermission):
@@ -80,7 +80,9 @@ class IsTeamMemberOrAdmin(permissions.BasePermission):
 
         # Check if user is a member of the same team (for read operations)
         if hasattr(user, "id") and hasattr(obj, "team"):
-            is_member = TeamMember.objects.filter(team=obj.team, user_id=user.id).exists()
+            is_member = TeamMember.objects.filter(
+                team=obj.team, user_id=user.id
+            ).exists()
             if is_member and request.method in permissions.SAFE_METHODS:
                 return True
 
