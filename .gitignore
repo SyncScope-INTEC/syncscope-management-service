@@ -212,3 +212,11 @@ __marimo__/
 .env.*.local
 .env.local
 .env.*
+
+# Static files
+static/
+.DS_Store
+thumbs.db
+.vscode/
+.idea/
+staticfiles/
