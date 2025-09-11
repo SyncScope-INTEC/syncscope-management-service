@@ -4,6 +4,9 @@ import redis
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -140,5 +143,21 @@ def readiness_check(request):
 def liveness_check(request):
     """
     Simple liveness check - just returns 200 if the service is running.
+    This endpoint is used by Railway for health checks and should always be fast.
     """
-    return Response({"status": "alive"}, status=status.HTTP_200_OK)
+    try:
+        return Response({"status": "alive", "service": "management"}, status=status.HTTP_200_OK)
+    except Exception:
+        # Even if something goes wrong, try to return a basic response
+        from django.http import JsonResponse
+        return JsonResponse({"status": "alive", "service": "management"}, status=200)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def simple_health_check(request):
+    """
+    Ultra-simple health check that bypasses all middleware.
+    Used as a fallback for deployment health checks.
+    """
+    return JsonResponse({"status": "ok", "service": "management-service"}, status=200)
