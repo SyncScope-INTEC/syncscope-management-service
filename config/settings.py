@@ -345,7 +345,8 @@ SPECTACULAR_SETTINGS = {
         }
     },
     "SERVERS": [
-        {"url": "http://localhost:8002", "description": "Local development server"},
+        {"url": "http://127.0.0.1:8000", "description": "Local development server (127.0.0.1)"},
+        {"url": "http://localhost:8002", "description": "Local development server (localhost)"},
         {
             "url": "https://syncscope-management-service-dev.up.railway.app",
             "description": "Development server",

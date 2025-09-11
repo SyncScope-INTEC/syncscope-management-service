@@ -142,6 +142,12 @@ def api_home(request):
         description="Update team information.",
         request=TeamUpdateSerializer,
     ),
+    partial_update=extend_schema(
+        tags=["Teams"],
+        summary="Partially update team",
+        description="Partially update team information.",
+        request=TeamUpdateSerializer,
+    ),
     destroy=extend_schema(
         tags=["Teams"],
         summary="Delete team",
@@ -277,6 +283,11 @@ class TeamViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         tags=["Projects"],
         summary="Update project",
         description="Update project information.",
+    ),
+    partial_update=extend_schema(
+        tags=["Projects"],
+        summary="Partially update project",
+        description="Partially update project information.",
     ),
     destroy=extend_schema(
         tags=["Projects"],
@@ -414,6 +425,11 @@ class ProjectViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         summary="Update team member",
         description="Update team member role or information.",
     ),
+    partial_update=extend_schema(
+        tags=["Team Members"],
+        summary="Partially update team member",
+        description="Partially update team member role or information.",
+    ),
     destroy=extend_schema(
         tags=["Team Members"],
         summary="Remove team member",
@@ -462,6 +478,11 @@ class TeamMemberViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         tags=["Integrations"],
         summary="Update integration",
         description="Update integration configuration.",
+    ),
+    partial_update=extend_schema(
+        tags=["Integrations"],
+        summary="Partially update integration",
+        description="Partially update integration configuration.",
     ),
     destroy=extend_schema(
         tags=["Integrations"],
@@ -517,6 +538,11 @@ class IntegrationViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         tags=["Integrations"],
         summary="Update GitHub integration",
         description="Update GitHub integration configuration.",
+    ),
+    partial_update=extend_schema(
+        tags=["Integrations"],
+        summary="Partially update GitHub integration",
+        description="Partially update GitHub integration configuration.",
     ),
     destroy=extend_schema(
         tags=["Integrations"],

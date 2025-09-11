@@ -306,7 +306,8 @@ paths:
           description: ''
     patch:
       operationId: github_integrations_partial_update
-      description: ViewSet for managing GitHub integrations.
+      description: Partially update GitHub integration configuration.
+      summary: Partially update GitHub integration
       parameters:
       - in: path
         name: id
@@ -316,7 +317,7 @@ paths:
         description: A UUID string identifying this git hub integration.
         required: true
       tags:
-      - github-integrations
+      - Integrations
       requestBody:
         content:
           application/json:
@@ -503,7 +504,8 @@ paths:
           description: ''
     patch:
       operationId: integrations_partial_update
-      description: ViewSet for managing integrations.
+      description: Partially update integration configuration.
+      summary: Partially update integration
       parameters:
       - in: path
         name: id
@@ -513,7 +515,7 @@ paths:
         description: A UUID string identifying this integration.
         required: true
       tags:
-      - integrations
+      - Integrations
       requestBody:
         content:
           application/json:
@@ -664,7 +666,8 @@ paths:
           description: ''
     patch:
       operationId: projects_partial_update
-      description: ViewSet for managing projects.
+      description: Partially update project information.
+      summary: Partially update project
       parameters:
       - in: path
         name: id
@@ -674,7 +677,7 @@ paths:
         description: A UUID string identifying this project.
         required: true
       tags:
-      - projects
+      - Projects
       requestBody:
         content:
           application/json:
@@ -908,7 +911,8 @@ paths:
           description: ''
     patch:
       operationId: team_members_partial_update
-      description: ViewSet for managing team members.
+      description: Partially update team member role or information.
+      summary: Partially update team member
       parameters:
       - in: path
         name: id
@@ -918,7 +922,7 @@ paths:
         description: A UUID string identifying this team member.
         required: true
       tags:
-      - team-members
+      - Team Members
       requestBody:
         content:
           application/json:
@@ -1068,7 +1072,8 @@ paths:
           description: ''
     patch:
       operationId: teams_partial_update
-      description: ViewSet for managing teams.
+      description: Partially update team information.
+      summary: Partially update team
       parameters:
       - in: path
         name: id
@@ -1078,7 +1083,7 @@ paths:
         description: A UUID string identifying this team.
         required: true
       tags:
-      - teams
+      - Teams
       requestBody:
         content:
           application/json:
@@ -2256,8 +2261,10 @@ components:
       bearerFormat: JWT
       description: 'Enter your Bearer token in the format: Bearer <token>'
 servers:
+- url: http://127.0.0.1:8000
+  description: Local development server (127.0.0.1)
 - url: http://localhost:8002
-  description: Local development server
+  description: Local development server (localhost)
 - url: https://syncscope-management-service-dev.up.railway.app
   description: Development server
 tags:
