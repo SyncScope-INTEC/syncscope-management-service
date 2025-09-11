@@ -13,11 +13,13 @@ from drf_spectacular.views import (
 )
 
 from apps.management.health import health_check, liveness_check, readiness_check, simple_health_check
-from apps.management.views import api_home
+from apps.management.views import api_home, favicon_view
 
 urlpatterns = [
     # Home page
     path("", api_home, name="api_home"),
+    # Favicon
+    path("favicon.ico", favicon_view, name="favicon"),
     path("admin/", admin.site.urls),
     # Health check endpoints
     path("health/", simple_health_check, name="health_check"),  # Ultra-simple health check for Railway
