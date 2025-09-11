@@ -6,6 +6,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
+from django.views.generic import RedirectView
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
@@ -14,7 +15,6 @@ from drf_spectacular.views import (
 
 from apps.management.health import health_check, liveness_check, readiness_check, simple_health_check
 from apps.management.views import api_home
-from django.views.generic import RedirectView
 
 urlpatterns = [
     # Home page
