@@ -476,7 +476,7 @@ class TestAPIHomeView:
 
         assert "SyncScope Management Service" in content
         assert "1.0.0" in content
-        assert "Team and project management service" in content
+        assert "Team & Project Hub" in content
 
 
 @pytest.mark.django_db

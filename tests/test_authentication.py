@@ -359,7 +359,7 @@ class TestAuthenticationIntegration:
         client = APIClient()
         client.credentials(HTTP_AUTHORIZATION="Bearer test-token")
 
-        response = client.get("/management/api/teams/")
+        response = client.get("/management/teams/")
 
         # Should pass authentication
         assert response.status_code in [200, 404]  # 404 if no teams found
@@ -375,12 +375,12 @@ class TestAuthenticationIntegration:
 
         # Test various endpoints without authentication
         endpoints = [
-            "/management/api/teams/",
-            "/management/api/projects/",
-            "/management/api/team-members/",
-            "/management/api/integrations/",
-            "/management/api/github-integrations/",
-            "/management/api/commits/",
+            "/management/teams/",
+            "/management/projects/",
+            "/management/team-members/",
+            "/management/integrations/",
+            "/management/github-integrations/",
+            "/management/commits/",
         ]
 
         for endpoint in endpoints:
