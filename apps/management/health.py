@@ -150,6 +150,7 @@ def liveness_check(request):
     except Exception:
         # Even if something goes wrong, try to return a basic response
         from django.http import JsonResponse
+
         return JsonResponse({"status": "alive", "service": "management"}, status=200)
 
 
