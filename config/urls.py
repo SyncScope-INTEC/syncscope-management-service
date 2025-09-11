@@ -14,10 +14,13 @@ from drf_spectacular.views import (
 
 from apps.management.health import health_check, liveness_check, readiness_check, simple_health_check
 from apps.management.views import api_home
+from django.views.generic import RedirectView
 
 urlpatterns = [
     # Home page
     path("", api_home, name="api_home"),
+    # Favicon redirect
+    path("favicon.ico", RedirectView.as_view(url="/static/management/images/syncscope-logo.svg", permanent=True)),
     path("admin/", admin.site.urls),
     # Health check endpoints
     path("health/", simple_health_check, name="health_check"),  # Ultra-simple health check for Railway
