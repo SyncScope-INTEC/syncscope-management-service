@@ -627,15 +627,15 @@ class CodeCommitViewSet(ServerlessViewMixin, viewsets.ReadOnlyModelViewSet):
         return CodeCommit.objects.none()
 
 
-@api_view(["GET"])  
+@api_view(["GET"])
 @permission_classes([permissions.AllowAny])
 def favicon_view(request):
     """
     Simple favicon handler that serves SVG as ICO.
     """
-    from django.templatetags.static import static
     from django.shortcuts import redirect
-    
+    from django.templatetags.static import static
+
     # Redirect to the static SVG file
-    svg_url = static('management/images/syncscope-logo.svg')
+    svg_url = static("management/images/syncscope-logo.svg")
     return redirect(svg_url)
