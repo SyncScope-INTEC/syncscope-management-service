@@ -213,8 +213,7 @@ __marimo__/
 .env.local
 .env.*
 
-# Static files
-static/
+# Static files (only ignore collected, not source files)
 .DS_Store
 thumbs.db
 .vscode/
