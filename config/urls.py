@@ -6,7 +6,6 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
-from django.views.generic import RedirectView
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
@@ -19,8 +18,6 @@ from apps.management.views import api_home
 urlpatterns = [
     # Home page
     path("", api_home, name="api_home"),
-    # Favicon redirect
-    path("favicon.ico", RedirectView.as_view(url="/static/management/images/syncscope-logo.svg", permanent=True)),
     path("admin/", admin.site.urls),
     # Health check endpoints
     path("health/", simple_health_check, name="health_check"),  # Ultra-simple health check for Railway
