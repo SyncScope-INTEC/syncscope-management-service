@@ -1,5 +1,10 @@
 # SyncScope Management Service
 
+[![Build Status](https://github.com/AlejandroBeltre/syncscope-management-service/workflows/CI/badge.svg)](https://github.com/AlejandroBeltre/syncscope-management-service/actions)
+[![Coverage Status](https://coveralls.io/repos/github/AlejandroBeltre/syncscope-management-service/badge.svg?branch=main)](https://coveralls.io/github/AlejandroBeltre/syncscope-management-service?branch=main)
+[![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
+[![Django Version](https://img.shields.io/badge/django-4.2+-green.svg)](https://djangoproject.com)
+
 Team and project management service for the SyncScope platform.
 
 ## 🎯 Overview
