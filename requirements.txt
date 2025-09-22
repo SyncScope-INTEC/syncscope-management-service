@@ -3,7 +3,7 @@ asgiref==3.9.1
 attrs==25.3.0
 bcrypt==4.3.0
 billiard==4.2.1
-black==25.1.0
+black==25.9.0
 celery==5.5.3
 certifi==2025.8.3
 charset-normalizer==3.4.3
