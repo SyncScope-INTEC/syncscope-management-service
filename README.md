@@ -1,13 +1,13 @@
 # SyncScope Management Service
 
-[![Build Status](https://github.com/SyncScope-INTEC/syncscope-management-service/workflows/CI/badge.svg)](https://github.com/SyncScope-INTEC/syncscope-management-service/actions)
-[![Coverage Status](https://coveralls.io/repos/github/SyncScope-INTEC/syncscope-management-service/badge.svg?branch=main)](https://coveralls.io/github/SyncScope-INTEC/syncscope-management-service?branch=main)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/status-development-orange.svg)](https://github.com/SyncScope-INTEC/syncscope-management-service)
 [![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
 [![Django Version](https://img.shields.io/badge/django-4.2+-green.svg)](https://djangoproject.com)
 
 Team and project management service for the SyncScope platform.
 
-## 🎯 Overview
+## Overview
 
 The Management Service handles:
 - **Team Management**: Create and manage development teams
@@ -16,7 +16,7 @@ The Management Service handles:
 - **Integration Management**: Connect projects with external services (GitHub, Slack, etc.)
 - **GitHub Integration**: Sync repositories, commits, and pull requests
 
-## 🏗️ Architecture
+## Architecture
 
 - **Framework**: Django + Django REST Framework
 - **Database**: PostgreSQL (management schema)
@@ -24,7 +24,7 @@ The Management Service handles:
 - **API Documentation**: OpenAPI/Swagger with drf-spectacular
 - **Deployment**: Railway
 
-## 📊 Database Schema
+## Database Schema
 
 The service uses the `management` schema with these main entities:
 - `teams` - Development teams
@@ -34,7 +34,7 @@ The service uses the `management` schema with these main entities:
 - `github_integrations` - GitHub-specific integration data
 - `code_commits` - Commit history from integrated repositories
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Python 3.11+
@@ -76,7 +76,7 @@ docker build -t management-service .
 docker run -p 8003:8000 --env-file .env management-service
 ```
 
-## 🔌 API Endpoints
+## API Endpoints
 
 ### Teams
 - `GET /management/api/teams/` - List teams
@@ -121,7 +121,7 @@ docker run -p 8003:8000 --env-file .env management-service
 - `GET /health/ready/` - Readiness probe
 - `GET /health/live/` - Liveness probe
 
-## 🔐 Authentication & Authorization
+## Authentication & Authorization
 
 ### Remote Authentication
 The service uses JWT tokens validated against the Auth Service:
@@ -140,7 +140,7 @@ curl -H "Authorization: Bearer <jwt-token>" \
 - `IsTeamMemberOrAdmin` - Team member operations  
 - `IsProjectMemberOrAdmin` - Project operations
 
-## 🧪 Testing
+## Testing
 
 ### Run Tests
 ```bash
@@ -165,7 +165,7 @@ The project maintains ≥80% test coverage with comprehensive tests for:
 - Serializers and validation
 - Admin interface
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 ```bash
@@ -190,7 +190,7 @@ MAX_PROJECTS_PER_TEAM=50
 MAX_INTEGRATIONS_PER_PROJECT=10
 ```
 
-## 📋 Models
+## Models
 
 ### Team
 ```python
@@ -220,7 +220,7 @@ class TeamMember(models.Model):
     joined_at = DateTimeField(default=timezone.now)
 ```
 
-## 🚀 Deployment
+## Deployment
 
 ### Railway Deployment
 The service is configured for Railway deployment with:
@@ -235,7 +235,7 @@ The service is configured for Railway deployment with:
 - **Development**: Single worker, reload enabled
 - **QA**: Balanced configuration for testing
 
-## 🔍 Monitoring
+## Monitoring
 
 ### Health Endpoints
 - `/health/` - Comprehensive health check with database and cache status
@@ -249,7 +249,7 @@ Structured logging with:
 - Authentication events
 - Integration sync events
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -269,13 +269,13 @@ Structured logging with:
 - Authentication/permission tests
 - Maintain ≥80% coverage
 
-## 📚 API Documentation
+## API Documentation
 
 - **Swagger UI**: `/api/docs/`
 - **ReDoc**: `/api/redoc/`
 - **OpenAPI Schema**: `/api/schema/`
 
-## 🔗 Service Dependencies
+## Service Dependencies
 
 - **Auth Service**: User authentication and authorization
 - **PostgreSQL**: Primary database with management schema
