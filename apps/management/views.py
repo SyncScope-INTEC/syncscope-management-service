@@ -696,26 +696,28 @@ def get_git_events_team(request):
     try:
         # For now, return mock data since we don't have git events model yet
         # This should be connected to actual git events data in the future
-        return Response({
-            "events": [
-                {
-                    "event_id": "git-event-1",
-                    "team_id": "default",
-                    "repository": "syncscope-platform",
-                    "event_type": "push",
-                    "timestamp": "2024-01-01T10:00:00Z",
-                    "author": "developer@example.com",
-                    "commits": 2,
-                    "additions": 150,
-                    "deletions": 30
-                }
-            ],
-            "total_events": 1,
-            "period": {
-                "start_date": request.GET.get("start_date", "2024-01-01T00:00:00Z"),
-                "end_date": request.GET.get("end_date", "2024-12-31T23:59:59Z")
+        return Response(
+            {
+                "events": [
+                    {
+                        "event_id": "git-event-1",
+                        "team_id": "default",
+                        "repository": "syncscope-platform",
+                        "event_type": "push",
+                        "timestamp": "2024-01-01T10:00:00Z",
+                        "author": "developer@example.com",
+                        "commits": 2,
+                        "additions": 150,
+                        "deletions": 30,
+                    }
+                ],
+                "total_events": 1,
+                "period": {
+                    "start_date": request.GET.get("start_date", "2024-01-01T00:00:00Z"),
+                    "end_date": request.GET.get("end_date", "2024-12-31T23:59:59Z"),
+                },
             }
-        })
+        )
 
     except Exception as e:
         return Response(
