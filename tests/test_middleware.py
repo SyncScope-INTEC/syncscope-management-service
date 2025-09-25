@@ -1,7 +1,9 @@
 """
 Simple tests for management service middleware components.
 """
+
 from unittest.mock import Mock, patch
+
 import pytest
 from django.http import HttpResponse
 from django.test import RequestFactory, TestCase
@@ -55,7 +57,7 @@ class TestSecurityHeadersMiddlewareSimple:
         request = self.factory.get("/")
         response = self.middleware(request)
         assert response is not None
-        assert hasattr(response, 'status_code')
+        assert hasattr(response, "status_code")
 
     def test_adds_some_security_headers(self):
         """Test that some security headers are added."""
@@ -80,7 +82,7 @@ class TestRequestLoggingMiddlewareSimple:
         request = self.factory.get("/test-path/")
         response = self.middleware(request)
         assert response is not None
-        assert hasattr(response, 'status_code')
+        assert hasattr(response, "status_code")
 
     def test_handles_request_without_error(self):
         """Test that middleware handles requests without errors."""
