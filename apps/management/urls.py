@@ -13,6 +13,7 @@ from .views import (
     TeamMemberViewSet,
     TeamViewSet,
     api_home,
+    get_git_events_team,
 )
 
 # Create router and register viewsets
@@ -29,4 +30,6 @@ app_name = "management"
 urlpatterns = [
     path("", api_home, name="api_home"),
     path("", include(router.urls)),
+    # Analytics integration endpoints
+    path("git-events/team/", get_git_events_team, name="get_git_events_team"),
 ]
