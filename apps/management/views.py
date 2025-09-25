@@ -639,3 +639,49 @@ def favicon_view(request):
     # Redirect to the static SVG file
     svg_url = static("management/images/syncscope-logo.svg")
     return redirect(svg_url)
+
+
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def api_get_team_members(request, team_id):
+    """
+    API endpoint for analytics service integration to get team members.
+    """
+    try:
+        # For the "default" team, return a default structure
+        if team_id == "default":
+            return Response(
+                {
+                    "team_id": "default",
+                    "name": "Default Team",
+                    "members": [
+                        {
+                            "user_id": "default-user",
+                            "username": "default_user",
+                            "role": "member",
+                            "joined_at": "2024-01-01T00:00:00Z",
+                        }
+                    ],
+                    "member_count": 1,
+                }
+            )
+
+        # Try to get the actual team
+        try:
+            team = Team.objects.get(id=team_id)
+            members = TeamMember.objects.filter(team=team)
+            serializer = TeamMemberSerializer(members, many=True)
+
+            return Response(
+                {"team_id": str(team.id), "name": team.name, "members": serializer.data, "member_count": members.count()}
+            )
+        except Team.DoesNotExist:
+            return Response(
+                {"error": f"Team '{team_id}' not found", "team_id": team_id, "members": [], "member_count": 0}, status=404
+            )
+
+    except Exception as e:
+        return Response(
+            {"error": f"Failed to get team members: {str(e)}", "team_id": team_id, "members": [], "member_count": 0},
+            status=500,
+        )

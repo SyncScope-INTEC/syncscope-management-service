@@ -13,7 +13,7 @@ from drf_spectacular.views import (
 )
 
 from apps.management.health import health_check, liveness_check, readiness_check, simple_health_check
-from apps.management.views import api_home, favicon_view
+from apps.management.views import api_get_team_members, api_home, favicon_view
 
 urlpatterns = [
     # Home page
@@ -28,6 +28,8 @@ urlpatterns = [
     path("health/live/", liveness_check, name="liveness_check"),
     # Management endpoints
     path("management/", include("apps.management.urls")),
+    # API endpoints for analytics service integration
+    path("api/teams/<str:team_id>/members", api_get_team_members, name="api_team_members"),
     # API Documentation
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
