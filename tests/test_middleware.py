@@ -1,16 +1,18 @@
 """
 Tests for management service middleware components.
 """
-import pytest
+
 from unittest.mock import Mock, patch
+
+import pytest
 from django.http import HttpResponse
 from django.test import RequestFactory, override_settings
 
 from apps.management.middleware import (
-    SecurityHeadersMiddleware,
-    RequestLoggingMiddleware,
-    RateLimitMiddleware,
     CorsMiddleware,
+    RateLimitMiddleware,
+    RequestLoggingMiddleware,
+    SecurityHeadersMiddleware,
 )
 
 
@@ -249,22 +251,20 @@ class TestMiddlewareIntegration:
         middleware = settings.MIDDLEWARE
 
         # Security headers should come early
-        security_index = next(i for i, m in enumerate(middleware)
-                            if "SecurityHeadersMiddleware" in m)
+        security_index = next(i for i, m in enumerate(middleware) if "SecurityHeadersMiddleware" in m)
 
         # Request logging should come after security
-        logging_index = next(i for i, m in enumerate(middleware)
-                           if "RequestLoggingMiddleware" in m)
+        logging_index = next(i for i, m in enumerate(middleware) if "RequestLoggingMiddleware" in m)
 
         assert security_index < logging_index
 
     def test_middleware_can_be_imported(self):
         """Test that all middleware classes can be imported."""
         from apps.management.middleware import (
-            SecurityHeadersMiddleware,
-            RequestLoggingMiddleware,
-            RateLimitMiddleware,
             CorsMiddleware,
+            RateLimitMiddleware,
+            RequestLoggingMiddleware,
+            SecurityHeadersMiddleware,
         )
 
         assert SecurityHeadersMiddleware is not None

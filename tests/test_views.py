@@ -606,10 +606,7 @@ class TestAnalyticsIntegrationViews:
         from django.urls import reverse
 
         url = reverse("get_git_events_team")
-        params = {
-            "start_date": "2024-01-01T00:00:00Z",
-            "end_date": "2024-12-31T23:59:59Z"
-        }
+        params = {"start_date": "2024-01-01T00:00:00Z", "end_date": "2024-12-31T23:59:59Z"}
         response = api_client.get(url, params)
 
         assert response.status_code == status.HTTP_200_OK

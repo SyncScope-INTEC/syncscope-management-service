@@ -1,14 +1,16 @@
 """
 Tests for database mixins and serverless handling.
 """
-import pytest
+
 from unittest.mock import Mock, patch
+
+import pytest
 from django.db import transaction
 from django.test import TestCase, override_settings
 
 from apps.management.db_mixins import (
-    RetryableModelMixin,
     RetryableManager,
+    RetryableModelMixin,
     RetryableUserManager,
     ServerlessViewMixin,
 )
@@ -25,7 +27,7 @@ class TestRetryableModelMixin:
             name = models.CharField(max_length=100)
 
             class Meta:
-                app_label = 'test'
+                app_label = "test"
 
         self.TestModel = TestModel
         self.instance = TestModel()
@@ -35,7 +37,7 @@ class TestRetryableModelMixin:
         """Test that save operations use retry logic."""
         mock_retry.return_value = lambda func: func
 
-        with patch.object(self.instance.__class__.__bases__[1], 'save'):
+        with patch.object(self.instance.__class__.__bases__[1], "save"):
             self.instance.save()
             mock_retry.assert_called()
 
@@ -44,7 +46,7 @@ class TestRetryableModelMixin:
         """Test that delete operations use retry logic."""
         mock_retry.return_value = lambda func: func
 
-        with patch.object(self.instance.__class__.__bases__[1], 'delete'):
+        with patch.object(self.instance.__class__.__bases__[1], "delete"):
             self.instance.delete()
             mock_retry.assert_called()
 
@@ -53,7 +55,7 @@ class TestRetryableModelMixin:
         """Test that refresh_from_db operations use retry logic."""
         mock_retry.return_value = lambda func: func
 
-        with patch.object(self.instance.__class__.__bases__[1], 'refresh_from_db'):
+        with patch.object(self.instance.__class__.__bases__[1], "refresh_from_db"):
             self.instance.refresh_from_db()
             mock_retry.assert_called()
 
@@ -62,7 +64,7 @@ class TestRetryableModelMixin:
         """Test that objects.get operations use retry logic."""
         mock_retry.return_value = lambda func: func
 
-        with patch.object(self.TestModel.objects, 'get'):
+        with patch.object(self.TestModel.objects, "get"):
             self.TestModel.objects_get(id=1)
             mock_retry.assert_called()
 
@@ -71,7 +73,7 @@ class TestRetryableModelMixin:
         """Test that objects.create operations use retry logic."""
         mock_retry.return_value = lambda func: func
 
-        with patch.object(self.TestModel.objects, 'create'):
+        with patch.object(self.TestModel.objects, "create"):
             self.TestModel.objects_create(name="test")
             mock_retry.assert_called()
 
@@ -96,7 +98,7 @@ class TestServerlessViewMixin:
         mock_request = Mock()
         mock_super_dispatch = Mock(return_value="response")
 
-        with patch.object(self.view.__class__.__bases__[1], 'dispatch', mock_super_dispatch):
+        with patch.object(self.view.__class__.__bases__[1], "dispatch", mock_super_dispatch):
             result = self.view.dispatch(mock_request)
 
         assert result == "response"
@@ -112,7 +114,7 @@ class TestServerlessViewMixin:
         mock_request = Mock()
         mock_super_dispatch = Mock(return_value="response")
 
-        with patch.object(self.view.__class__.__bases__[1], 'dispatch', mock_super_dispatch):
+        with patch.object(self.view.__class__.__bases__[1], "dispatch", mock_super_dispatch):
             result = self.view.dispatch(mock_request)
 
         assert result == "response"
@@ -138,7 +140,7 @@ class TestServerlessViewMixin:
         mock_is_retryable.return_value = True
         mock_exc = Exception("Database error")
 
-        with patch.object(self.view.__class__.__bases__[1], 'handle_exception') as mock_super:
+        with patch.object(self.view.__class__.__bases__[1], "handle_exception") as mock_super:
             self.view.handle_exception(mock_exc)
 
         mock_health_check.mark_unhealthy.assert_called_once()
@@ -156,7 +158,7 @@ class TestRetryableManager:
         """Test that get operations use retry logic."""
         mock_retry.return_value = lambda func: func
 
-        with patch.object(self.manager.__class__.__bases__[0], 'get'):
+        with patch.object(self.manager.__class__.__bases__[0], "get"):
             self.manager.get(id=1)
             mock_retry.assert_called()
 
@@ -165,7 +167,7 @@ class TestRetryableManager:
         """Test that filter operations use retry logic."""
         mock_retry.return_value = lambda func: func
 
-        with patch.object(self.manager.__class__.__bases__[0], 'filter'):
+        with patch.object(self.manager.__class__.__bases__[0], "filter"):
             self.manager.filter(name="test")
             mock_retry.assert_called()
 
@@ -174,7 +176,7 @@ class TestRetryableManager:
         """Test that create operations use retry logic."""
         mock_retry.return_value = lambda func: func
 
-        with patch.object(self.manager.__class__.__bases__[0], 'create'):
+        with patch.object(self.manager.__class__.__bases__[0], "create"):
             self.manager.create(name="test")
             mock_retry.assert_called()
 
@@ -183,7 +185,7 @@ class TestRetryableManager:
         """Test that bulk_create operations use retry logic."""
         mock_retry.return_value = lambda func: func
 
-        with patch.object(self.manager.__class__.__bases__[0], 'bulk_create'):
+        with patch.object(self.manager.__class__.__bases__[0], "bulk_create"):
             self.manager.bulk_create([])
             mock_retry.assert_called()
 
@@ -192,7 +194,7 @@ class TestRetryableManager:
         """Test that count operations use retry logic."""
         mock_retry.return_value = lambda func: func
 
-        with patch.object(self.manager.__class__.__bases__[0], 'count'):
+        with patch.object(self.manager.__class__.__bases__[0], "count"):
             self.manager.count()
             mock_retry.assert_called()
 
@@ -204,6 +206,7 @@ class TestRetryableUserManager:
         self.manager = RetryableUserManager()
         # Mock the model
         from django.contrib.auth.models import AbstractUser
+
         self.manager.model = AbstractUser
 
     @patch("apps.management.db_mixins.database_retry")
@@ -211,13 +214,15 @@ class TestRetryableUserManager:
         """Test that create_user operations use retry logic."""
         mock_retry.return_value = lambda func: func
 
-        with patch.object(self.manager, 'normalize_email', return_value="test@example.com"), \
-             patch.object(self.manager.model, 'set_password'), \
-             patch.object(self.manager.model, 'save'):
+        with (
+            patch.object(self.manager, "normalize_email", return_value="test@example.com"),
+            patch.object(self.manager.model, "set_password"),
+            patch.object(self.manager.model, "save"),
+        ):
 
             # Mock the model instance
             mock_user = Mock()
-            with patch.object(self.manager, 'model', return_value=mock_user):
+            with patch.object(self.manager, "model", return_value=mock_user):
                 user = self.manager.create_user("test@example.com", "password")
                 mock_retry.assert_called()
 
@@ -226,7 +231,7 @@ class TestRetryableUserManager:
         """Test that create_superuser operations use retry logic."""
         mock_retry.return_value = lambda func: func
 
-        with patch.object(self.manager, 'create_user') as mock_create_user:
+        with patch.object(self.manager, "create_user") as mock_create_user:
             self.manager.create_superuser("admin@example.com", "password")
             mock_create_user.assert_called_once()
 
@@ -239,7 +244,7 @@ class TestRetryableUserManager:
     def test_create_superuser_validation(self):
         """Test superuser validation."""
         with pytest.raises(ValueError, match="Superuser must have is_staff=True"):
-            with patch.object(self.manager, 'create_user'):
+            with patch.object(self.manager, "create_user"):
                 self.manager.create_superuser("admin@example.com", "password", is_staff=False)
 
     @patch("apps.management.db_mixins.database_retry")
@@ -247,11 +252,9 @@ class TestRetryableUserManager:
         """Test that get_or_create operations use retry logic."""
         mock_retry.return_value = lambda func: func
 
-        with patch.object(self.manager.__class__.__bases__[0], 'get_or_create'):
+        with patch.object(self.manager.__class__.__bases__[0], "get_or_create"):
             self.manager.get_or_create(email="test@example.com")
             mock_retry.assert_called()
-
-
 
 
 @pytest.mark.django_db
@@ -261,8 +264,8 @@ class TestMixinIntegration:
     def test_mixins_can_be_imported(self):
         """Test that all mixins can be imported."""
         from apps.management.db_mixins import (
-            RetryableModelMixin,
             RetryableManager,
+            RetryableModelMixin,
             RetryableUserManager,
             ServerlessViewMixin,
         )
@@ -280,12 +283,12 @@ class TestMixinIntegration:
             name = models.CharField(max_length=100)
 
             class Meta:
-                app_label = 'test'
+                app_label = "test"
 
         model = TestModel()
-        assert hasattr(model, 'save')
-        assert hasattr(model, 'delete')
-        assert hasattr(TestModel, 'objects_create')
+        assert hasattr(model, "save")
+        assert hasattr(model, "delete")
+        assert hasattr(TestModel, "objects_create")
 
     @patch("config.database_retry.DatabaseHealthCheck")
     def test_serverless_mixin_with_actual_request(self, mock_health_check):
@@ -304,7 +307,7 @@ class TestMixinIntegration:
 
         view = TestView()
 
-        with patch.object(view.__class__.__bases__[1], 'dispatch', return_value="response"):
+        with patch.object(view.__class__.__bases__[1], "dispatch", return_value="response"):
             response = view.dispatch(request)
 
         mock_health_check.is_healthy.assert_called_once()
@@ -314,8 +317,8 @@ class TestMixinIntegration:
         manager = RetryableManager()
 
         # Test that all expected methods exist
-        assert hasattr(manager, 'get')
-        assert hasattr(manager, 'filter')
-        assert hasattr(manager, 'create')
-        assert hasattr(manager, 'bulk_create')
-        assert hasattr(manager, 'count')
+        assert hasattr(manager, "get")
+        assert hasattr(manager, "filter")
+        assert hasattr(manager, "create")
+        assert hasattr(manager, "bulk_create")
+        assert hasattr(manager, "count")
