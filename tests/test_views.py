@@ -548,3 +548,170 @@ class TestErrorHandling:
         response = api_client.get(url)
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.django_db
+class TestAnalyticsIntegrationViews:
+    """Test views created for analytics service integration."""
+
+    def test_api_get_team_members_default_team(self, api_client):
+        """Test getting default team members for analytics integration."""
+        from django.urls import reverse
+
+        url = reverse("api_team_members", args=["default"])
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["team_id"] == "default"
+        assert data["name"] == "Default Team"
+        assert len(data["members"]) == 1
+        assert data["member_count"] == 1
+        assert data["members"][0]["username"] == "default_user"
+
+    def test_api_get_team_members_with_params(self, api_client):
+        """Test team members endpoint with query parameters."""
+        from django.urls import reverse
+
+        url = reverse("api_team_members", args=["default"])
+        response = api_client.get(url, {"start_date": "2024-01-01", "end_date": "2024-12-31"})
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "team_id" in data
+        assert "members" in data
+
+    def test_get_git_events_team_success(self, api_client):
+        """Test successful git events retrieval."""
+        from django.urls import reverse
+
+        url = reverse("get_git_events_team")
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "events" in data
+        assert "total_events" in data
+        assert "period" in data
+        assert data["total_events"] == 1
+        assert len(data["events"]) == 1
+
+        event = data["events"][0]
+        assert event["event_id"] == "git-event-1"
+        assert event["team_id"] == "default"
+        assert event["event_type"] == "push"
+
+    def test_get_git_events_team_with_params(self, api_client):
+        """Test git events endpoint with date parameters."""
+        from django.urls import reverse
+
+        url = reverse("get_git_events_team")
+        params = {
+            "start_date": "2024-01-01T00:00:00Z",
+            "end_date": "2024-12-31T23:59:59Z"
+        }
+        response = api_client.get(url, params)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["period"]["start_date"] == "2024-01-01T00:00:00Z"
+        assert data["period"]["end_date"] == "2024-12-31T23:59:59Z"
+
+
+@pytest.mark.django_db
+class TestHealthEndpoints:
+    """Test health check endpoints."""
+
+    def test_health_check_success(self, api_client):
+        """Test successful health check."""
+        from django.urls import reverse
+
+        url = reverse("detailed_health_check")
+        response = api_client.get(url)
+
+        assert response.status_code in [status.HTTP_200_OK, status.HTTP_503_SERVICE_UNAVAILABLE]
+        data = response.json()
+        assert "status" in data
+        assert "timestamp" in data
+        assert "services" in data
+
+    def test_simple_health_check(self, api_client):
+        """Test simple health check endpoint."""
+        from django.urls import reverse
+
+        url = reverse("health_check")
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["status"] == "ok"
+        assert data["service"] == "management-service"
+
+    def test_readiness_check(self, api_client):
+        """Test readiness check endpoint."""
+        from django.urls import reverse
+
+        url = reverse("readiness_check")
+        response = api_client.get(url)
+
+        assert response.status_code in [status.HTTP_200_OK, status.HTTP_503_SERVICE_UNAVAILABLE]
+        data = response.json()
+        assert "status" in data
+
+    def test_liveness_check(self, api_client):
+        """Test liveness check endpoint."""
+        from django.urls import reverse
+
+        url = reverse("liveness_check")
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["status"] == "alive"
+        assert data["service"] == "management"
+
+    @patch("apps.management.health.cache.set")
+    @patch("apps.management.health.cache.get")
+    def test_health_check_cache_failure(self, mock_get, mock_set, api_client):
+        """Test health check with cache failure."""
+        from django.urls import reverse
+
+        mock_set.side_effect = Exception("Cache unavailable")
+        mock_get.side_effect = Exception("Cache unavailable")
+
+        url = reverse("detailed_health_check")
+        response = api_client.get(url)
+
+        # Should still return a response even if cache fails
+        assert response.status_code in [status.HTTP_200_OK, status.HTTP_503_SERVICE_UNAVAILABLE]
+        data = response.json()
+        assert "status" in data
+
+    @patch("apps.management.health.DatabaseHealthCheck.is_healthy")
+    def test_health_check_database_failure(self, mock_db_health, api_client):
+        """Test health check with database failure."""
+        from django.urls import reverse
+
+        mock_db_health.return_value = False
+
+        url = reverse("detailed_health_check")
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        data = response.json()
+        assert data["status"] == "unhealthy"
+        assert "errors" in data
+
+    @patch("apps.management.health.DatabaseHealthCheck.is_healthy")
+    def test_readiness_check_database_failure(self, mock_db_health, api_client):
+        """Test readiness check with database failure."""
+        from django.urls import reverse
+
+        mock_db_health.return_value = False
+
+        url = reverse("readiness_check")
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        data = response.json()
+        assert data["status"] == "not ready"
