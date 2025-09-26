@@ -14,7 +14,6 @@ from .views import (
     TeamViewSet,
     api_home,
     get_git_events_team,
-    get_user_commits_analytics,
 )
 
 # Create router and register viewsets
@@ -33,5 +32,4 @@ urlpatterns = [
     path("", include(router.urls)),
     # Analytics integration endpoints
     path("git-events/team/", get_git_events_team, name="get_git_events_team"),
-    path("user-commits/analytics/", get_user_commits_analytics, name="get_user_commits_analytics"),
 ]
