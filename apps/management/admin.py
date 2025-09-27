@@ -76,12 +76,14 @@ def safe_get_app_list(self, request):
             model_dict["view_only"] = not perms.get("change")
             try:
                 from django.urls import reverse
+
                 model_dict["admin_url"] = reverse("admin:%s_%s_changelist" % info)
             except:
                 pass
         if perms.get("add"):
             try:
                 from django.urls import reverse
+
                 model_dict["add_url"] = reverse("admin:%s_%s_add" % info)
             except:
                 pass
@@ -90,6 +92,7 @@ def safe_get_app_list(self, request):
             app_dict[app_label]["models"].append(model_dict)
         else:
             from django.urls import reverse
+
             try:
                 app_url = reverse("admin:app_list", kwargs={"app_label": app_label})
             except:
