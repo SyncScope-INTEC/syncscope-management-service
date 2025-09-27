@@ -40,7 +40,7 @@ def safe_index(self, request, extra_context=None):
         "title": self.index_title,
         "subtitle": None,
         "app_list": app_list,
-        "username": request.user.get_username() if hasattr(request, 'user') else None,
+        "username": request.user.get_username() if hasattr(request, "user") else None,
         **(extra_context or {}),
     }
 
