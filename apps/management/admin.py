@@ -25,8 +25,31 @@ def safe_log_action(self, user_id, content_type_id, object_id, object_repr, acti
     pass
 
 
-# Apply the monkey patch
+# Monkey patch AdminSite index to avoid LogEntry queries
+def safe_index(self, request, extra_context=None):
+    """
+    Safe admin index that doesn't query recent actions to avoid UUID/integer conflicts.
+    """
+    from django.contrib.admin.sites import AdminSite
+    from django.shortcuts import render
+
+    # Get the original index context without recent actions
+    app_list = self.get_app_list(request)
+    context = {
+        **self.each_context(request),
+        "title": self.index_title,
+        "subtitle": None,
+        "app_list": app_list,
+        "username": request.user.get_username() if hasattr(request, 'user') else None,
+        **(extra_context or {}),
+    }
+
+    return render(request, self.index_template or "admin/index.html", context)
+
+
+# Apply the monkey patches
 admin.ModelAdmin.log_action = safe_log_action
+admin.site.index = safe_index.__get__(admin.site, admin.AdminSite)
 
 
 class TeamMemberInline(admin.TabularInline):
