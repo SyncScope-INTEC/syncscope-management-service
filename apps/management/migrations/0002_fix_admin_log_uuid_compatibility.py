@@ -32,9 +32,13 @@ def ensure_admin_log_uuid_compatibility(apps, schema_editor):
 
             if current_type and current_type[0] == 'integer':
                 # Convert to UUID to match auth service
+                # Clear data first to avoid conversion issues
                 cursor.execute("DELETE FROM django_admin_log;")
                 cursor.execute("ALTER TABLE django_admin_log DROP CONSTRAINT IF EXISTS django_admin_log_user_id_fkey CASCADE;")
-                cursor.execute("ALTER TABLE django_admin_log ALTER COLUMN user_id TYPE UUID;")
+
+                # Use proper USING clause for type conversion
+                cursor.execute("ALTER TABLE django_admin_log ALTER COLUMN user_id TYPE UUID USING NULL;")
+
                 cursor.execute("""
                     ALTER TABLE django_admin_log
                     ADD CONSTRAINT django_admin_log_user_id_fkey
