@@ -4,6 +4,7 @@ API-based authentication backend that uses the SyncScope Auth Service.
 
 import logging
 import time
+import uuid
 
 import requests
 from django.conf import settings
@@ -14,14 +15,46 @@ from django.core.cache import cache
 logger = logging.getLogger(__name__)
 
 
+class SimplePKField:
+    """Mock primary key field to mimic Django's field behavior"""
+
+    def value_to_string(self, user):
+        """Convert user ID to string for session storage"""
+        return str(user.id)
+
+    def to_python(self, value):
+        """Convert string back to UUID for session retrieval"""
+        if value is None:
+            return value
+        # If it's already a UUID, return as string
+        if isinstance(value, uuid.UUID):
+            return str(value)
+        # If it's a string representation of UUID, return as-is
+        return str(value)
+
+
+class SimpleMeta:
+    """Mock _meta class to make SafeUser compatible with Django's session management"""
+
+    def __init__(self):
+        self.pk = SimplePKField()
+
+
 class SafeUser(User):
     """
-    Custom User proxy that handles save errors gracefully.
+    Custom User proxy that handles save errors gracefully and UUID session compatibility.
     Prevents DatabaseError when trying to update last_login in production.
     """
 
+    _meta = SimpleMeta()
+
     class Meta:
         proxy = True
+
+    @property
+    def pk(self):
+        """Primary key property for Django compatibility"""
+        return self.id
 
     def save(self, *args, **kwargs):
         """Override save to handle database errors gracefully."""
