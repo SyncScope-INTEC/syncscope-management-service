@@ -7,13 +7,27 @@ from django.db import migrations, connection
 def ensure_admin_log_uuid_compatibility(apps, schema_editor):
     """
     Ensure management service can work with UUID django_admin_log.user_id.
-    Since all services share the same database, the admin log must be UUID
-    to work with the auth service's UUID User model.
+    Only applies in production where services share the same database.
+    In CI/test environments, skip this migration since each service is isolated.
     """
     if connection.vendor != 'postgresql':
         return
 
     with connection.cursor() as cursor:
+        # Check if we're in a production environment with auth.users table
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = 'auth' AND table_name = 'users'
+            );
+        """)
+        auth_users_exists = cursor.fetchone()[0]
+
+        if not auth_users_exists:
+            # In CI/test environment - skip this migration
+            # Each service has its own isolated User model
+            return
+
         # Check if django_admin_log exists and its user_id type
         cursor.execute("""
             SELECT EXISTS (
@@ -31,7 +45,7 @@ def ensure_admin_log_uuid_compatibility(apps, schema_editor):
             current_type = cursor.fetchone()
 
             if current_type and current_type[0] == 'integer':
-                # Convert to UUID to match auth service
+                # Convert to UUID to match auth service in production
                 # Clear data first to avoid conversion issues
                 cursor.execute("DELETE FROM django_admin_log;")
                 cursor.execute("ALTER TABLE django_admin_log DROP CONSTRAINT IF EXISTS django_admin_log_user_id_fkey CASCADE;")
