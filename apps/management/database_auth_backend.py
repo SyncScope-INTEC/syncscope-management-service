@@ -8,62 +8,13 @@ import uuid
 
 import requests
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import BaseBackend
-from django.contrib.auth.models import User
 from django.core.cache import cache
 
+User = get_user_model()
+
 logger = logging.getLogger(__name__)
-
-
-class SimplePKField:
-    """Mock primary key field to mimic Django's field behavior"""
-
-    def value_to_string(self, user):
-        """Convert user ID to string for session storage"""
-        return str(user.id)
-
-    def to_python(self, value):
-        """Convert string back to UUID for session retrieval"""
-        if value is None:
-            return value
-        # If it's already a UUID, return as string
-        if isinstance(value, uuid.UUID):
-            return str(value)
-        # If it's a string representation of UUID, return as-is
-        return str(value)
-
-
-class SimpleMeta:
-    """Mock _meta class to make SafeUser compatible with Django's session management"""
-
-    def __init__(self):
-        self.pk = SimplePKField()
-
-
-class SafeUser(User):
-    """
-    Custom User proxy that handles save errors gracefully and UUID session compatibility.
-    Prevents DatabaseError when trying to update last_login in production.
-    """
-
-    _meta = SimpleMeta()
-
-    class Meta:
-        proxy = True
-
-    @property
-    def pk(self):
-        """Primary key property for Django compatibility"""
-        return self.id
-
-    def save(self, *args, **kwargs):
-        """Override save to handle database errors gracefully."""
-        try:
-            super().save(*args, **kwargs)
-        except Exception as e:
-            # Log the error but don't raise it to prevent login failures
-            logger.warning(f"SafeUser: Could not save user {self.username}: {str(e)}")
-            # Don't re-raise the exception to allow login to continue
 
 
 class AuthServiceAPIBackend(BaseBackend):
@@ -120,8 +71,8 @@ class AuthServiceAPIBackend(BaseBackend):
         Get user by ID for session management.
         """
         try:
-            return SafeUser.objects.get(pk=user_id)
-        except SafeUser.DoesNotExist:
+            return User.objects.get(pk=user_id)
+        except User.DoesNotExist:
             return None
 
     def _authenticate_with_service(self, email, password, max_retries=3):
@@ -168,11 +119,10 @@ class AuthServiceAPIBackend(BaseBackend):
             email = user_data["email"]
             role = user_data.get("role", "developer")
 
-            # Create or update local user using SafeUser
-            user, created = SafeUser.objects.get_or_create(
-                username=email,
+            # Create or update local user
+            user, created = User.objects.get_or_create(
+                email=email,  # Use email since that's the USERNAME_FIELD
                 defaults={
-                    "email": email,
                     "first_name": user_data.get("first_name", ""),
                     "last_name": user_data.get("last_name", ""),
                     "is_staff": user_data.get("is_staff", False) or role in ["admin", "supervisor"],

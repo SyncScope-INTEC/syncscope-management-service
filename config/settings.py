@@ -149,8 +149,8 @@ if not USE_SQLITE:
         }  # Don't persist connections in serverless
     )
 
-# Use default User model - management service integrates with auth service
-# AUTH_USER_MODEL = "django.contrib.auth.models.User"
+# Use custom User model with UUID primary key to match auth service
+AUTH_USER_MODEL = "management.User"
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
