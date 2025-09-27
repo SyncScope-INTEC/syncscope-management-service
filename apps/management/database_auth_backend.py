@@ -14,6 +14,25 @@ from django.core.cache import cache
 logger = logging.getLogger(__name__)
 
 
+class SafeUser(User):
+    """
+    Custom User proxy that handles save errors gracefully.
+    Prevents DatabaseError when trying to update last_login in production.
+    """
+
+    class Meta:
+        proxy = True
+
+    def save(self, *args, **kwargs):
+        """Override save to handle database errors gracefully."""
+        try:
+            super().save(*args, **kwargs)
+        except Exception as e:
+            # Log the error but don't raise it to prevent login failures
+            logger.warning(f"SafeUser: Could not save user {self.username}: {str(e)}")
+            # Don't re-raise the exception to allow login to continue
+
+
 class AuthServiceAPIBackend(BaseBackend):
     """
     Authentication backend that uses the SyncScope Auth Service API.
@@ -68,8 +87,8 @@ class AuthServiceAPIBackend(BaseBackend):
         Get user by ID for session management.
         """
         try:
-            return User.objects.get(pk=user_id)
-        except User.DoesNotExist:
+            return SafeUser.objects.get(pk=user_id)
+        except SafeUser.DoesNotExist:
             return None
 
     def _authenticate_with_service(self, email, password, max_retries=3):
@@ -116,8 +135,8 @@ class AuthServiceAPIBackend(BaseBackend):
             email = user_data["email"]
             role = user_data.get("role", "developer")
 
-            # Create or update local user
-            user, created = User.objects.get_or_create(
+            # Create or update local user using SafeUser
+            user, created = SafeUser.objects.get_or_create(
                 username=email,
                 defaults={
                     "email": email,
