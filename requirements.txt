@@ -1,5 +1,5 @@
 amqp==5.3.1
-asgiref==3.9.1
+asgiref==3.9.2
 attrs==25.3.0
 bcrypt==4.3.0
 billiard==4.2.2
@@ -46,7 +46,7 @@ pytest-django==4.11.1
 python-dateutil==2.9.0.post0
 python-decouple==3.8
 pytz==2025.2
-PyYAML==6.0.2
+PyYAML==6.0.3
 redis==6.4.0
 referencing==0.36.2
 requests==2.32.5
@@ -57,5 +57,5 @@ tzdata==2025.2
 uritemplate==4.2.0
 urllib3==2.5.0
 vine==5.1.0
-wcwidth==0.2.13
+wcwidth==0.2.14
 whitenoise==6.11.0
