@@ -23,7 +23,7 @@ djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
 drf-spectacular==0.28.0
 factory_boy==3.3.3
-Faker==37.8.0
+Faker==37.11.0
 gunicorn==23.0.0
 idna==3.10
 inflection==0.5.1
