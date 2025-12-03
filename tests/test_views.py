@@ -704,8 +704,13 @@ class TestHealthEndpoints:
 class TestProjectMemberViewSet:
     """Test ProjectMember API endpoints."""
 
-    def test_list_project_members(self, authenticated_client, project, project_member):
+    def test_list_project_members(self, authenticated_client, project, project_member, mock_user_data):
         """Test listing project members."""
+        from apps.management.models import ProjectMember, TeamMember
+
+        # Make authenticated user a team member so they can access project members
+        TeamMember.objects.get_or_create(team=project.team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
+
         url = reverse("management:projectmember-list")
         response = authenticated_client.get(url, {"project": project.id})
 
@@ -716,6 +721,11 @@ class TestProjectMemberViewSet:
 
     def test_create_project_member_success(self, authenticated_client, project, team_member, mock_user_data):
         """Test creating a project member successfully."""
+        from apps.management.models import ProjectMember, TeamMember
+
+        # Make authenticated user a team lead so they can add project members
+        TeamMember.objects.get_or_create(team=project.team, user_id=mock_user_data["user_id"], defaults={"role": "lead"})
+
         url = reverse("management:projectmember-list")
         data = {"project": str(project.id), "user_id": str(team_member.user_id), "role": "contributor"}
 
@@ -747,8 +757,15 @@ class TestProjectMemberViewSet:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_retrieve_project_member(self, authenticated_client, project_member):
+    def test_retrieve_project_member(self, authenticated_client, project_member, mock_user_data):
         """Test retrieving a specific project member."""
+        from apps.management.models import TeamMember
+
+        # Make authenticated user a team member so they can access project members
+        TeamMember.objects.get_or_create(
+            team=project_member.project.team, user_id=mock_user_data["user_id"], defaults={"role": "developer"}
+        )
+
         url = reverse("management:projectmember-detail", kwargs={"pk": project_member.id})
         response = authenticated_client.get(url)
 
@@ -757,8 +774,15 @@ class TestProjectMemberViewSet:
         assert str(data["user_id"]) == str(project_member.user_id)
         assert data["role"] == project_member.role
 
-    def test_update_project_member(self, authenticated_client, project_member):
+    def test_update_project_member(self, authenticated_client, project_member, mock_user_data):
         """Test updating project member role."""
+        from apps.management.models import ProjectMember, TeamMember
+
+        # Make authenticated user a team lead so they can update project members
+        TeamMember.objects.get_or_create(
+            team=project_member.project.team, user_id=mock_user_data["user_id"], defaults={"role": "lead"}
+        )
+
         url = reverse("management:projectmember-detail", kwargs={"pk": project_member.id})
         data = {"role": "viewer"}
 
@@ -768,9 +792,12 @@ class TestProjectMemberViewSet:
         response_data = response.json()
         assert response_data["role"] == "viewer"
 
-    def test_delete_project_member(self, authenticated_client, project, team_member):
+    def test_delete_project_member(self, authenticated_client, project, team_member, mock_user_data):
         """Test deleting a project member."""
-        from apps.management.models import ProjectMember
+        from apps.management.models import ProjectMember, TeamMember
+
+        # Make authenticated user a team lead so they can delete project members
+        TeamMember.objects.get_or_create(team=project.team, user_id=mock_user_data["user_id"], defaults={"role": "lead"})
 
         # Create a project member to delete
         member = ProjectMember.objects.create(project=project, user_id=team_member.user_id, role="contributor")
