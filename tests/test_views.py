@@ -832,7 +832,7 @@ class TestGetUserProjectsEndpoint:
         other_project = Project.objects.create(name="Other Project", team=other_team)
 
         # Add user as team member of other team
-        from apps.management.models import TeamMember, ProjectMember
+        from apps.management.models import ProjectMember, TeamMember
 
         TeamMember.objects.create(team=other_team, user_id=project_member.user_id, role="developer")
 
