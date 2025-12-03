@@ -716,8 +716,9 @@ class TestProjectMemberViewSet:
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data) >= 1
-        assert any(str(pm["user_id"]) == str(project_member.user_id) for pm in data)
+        results = data.get("results", data)  # Handle both paginated and non-paginated responses
+        assert len(results) >= 1
+        assert any(str(pm["user_id"]) == str(project_member.user_id) for pm in results)
 
     def test_create_project_member_success(self, authenticated_client, project, team_member, mock_user_data):
         """Test creating a project member successfully."""
