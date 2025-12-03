@@ -786,9 +786,17 @@ class TestProjectMemberViewSet:
 class TestGetUserProjectsEndpoint:
     """Test get_user_projects API endpoint."""
 
-    def test_get_user_projects_with_direct_membership(self, authenticated_client, project, project_member):
+    def test_get_user_projects_with_direct_membership(self, authenticated_client, project, mock_user_data):
         """Test getting projects where user is a direct member."""
-        url = reverse("management:get_user_projects", kwargs={"user_id": project_member.user_id})
+        # Create direct project membership for the authenticated user
+        from apps.management.models import ProjectMember, TeamMember
+
+        # First make authenticated user a team member
+        TeamMember.objects.get_or_create(team=project.team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
+        # Then make them a project member
+        ProjectMember.objects.get_or_create(project=project, user_id=mock_user_data["user_id"], defaults={"role": "contributor"})
+
+        url = reverse("management:get_user_projects", kwargs={"user_id": mock_user_data["user_id"]})
         response = authenticated_client.get(url)
 
         assert response.status_code == status.HTTP_200_OK
@@ -796,11 +804,16 @@ class TestGetUserProjectsEndpoint:
         assert "projects" in data
         assert len(data["projects"]) >= 1
         assert any(p["id"] == str(project.id) for p in data["projects"])
-        assert data["user_id"] == str(project_member.user_id)
+        assert str(data["user_id"]) == str(mock_user_data["user_id"])
 
-    def test_get_user_projects_with_team_membership(self, authenticated_client, team, project, team_member):
+    def test_get_user_projects_with_team_membership(self, authenticated_client, team, project, mock_user_data):
         """Test getting projects via team membership."""
-        url = reverse("management:get_user_projects", kwargs={"user_id": team_member.user_id})
+        from apps.management.models import TeamMember
+
+        # Make authenticated user a team member
+        TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
+
+        url = reverse("management:get_user_projects", kwargs={"user_id": mock_user_data["user_id"]})
         response = authenticated_client.get(url)
 
         assert response.status_code == status.HTTP_200_OK
@@ -811,10 +824,8 @@ class TestGetUserProjectsEndpoint:
 
     def test_get_user_projects_no_projects(self, authenticated_client, mock_user_data):
         """Test getting projects for user with no project access."""
-        import uuid
-
-        random_user_id = uuid.uuid4()
-        url = reverse("management:get_user_projects", kwargs={"user_id": random_user_id})
+        # Use authenticated user's ID but don't add any memberships
+        url = reverse("management:get_user_projects", kwargs={"user_id": mock_user_data["user_id"]})
         response = authenticated_client.get(url)
 
         assert response.status_code == status.HTTP_200_OK
@@ -823,23 +834,24 @@ class TestGetUserProjectsEndpoint:
         assert len(data["projects"]) == 0
         assert data["total_projects"] == 0
 
-    def test_get_user_projects_combines_both_sources(self, authenticated_client, team, project, team_member, project_member):
+    def test_get_user_projects_combines_both_sources(self, authenticated_client, team, project, mock_user_data):
         """Test that endpoint combines projects from both team and direct membership."""
-        from apps.management.models import Project
+        from apps.management.models import Project, ProjectMember, TeamMember
 
-        # Create another project that user is directly member of but not via team
+        # Make authenticated user a member of the first team
+        TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
+
+        # Create another project with another team
         other_team = team.__class__.objects.create(name="Other Team", company_id=team.company_id, created_by=team.created_by)
         other_project = Project.objects.create(name="Other Project", team=other_team)
 
-        # Add user as team member of other team
-        from apps.management.models import ProjectMember, TeamMember
+        # Add authenticated user as team member of other team
+        TeamMember.objects.create(team=other_team, user_id=mock_user_data["user_id"], role="developer")
 
-        TeamMember.objects.create(team=other_team, user_id=project_member.user_id, role="developer")
+        # Add authenticated user as direct project member of other project
+        ProjectMember.objects.create(project=other_project, user_id=mock_user_data["user_id"], role="contributor")
 
-        # Add user as project member of other project
-        ProjectMember.objects.create(project=other_project, user_id=project_member.user_id, role="contributor")
-
-        url = reverse("management:get_user_projects", kwargs={"user_id": project_member.user_id})
+        url = reverse("management:get_user_projects", kwargs={"user_id": mock_user_data["user_id"]})
         response = authenticated_client.get(url)
 
         assert response.status_code == status.HTTP_200_OK
