@@ -823,16 +823,12 @@ class TestGetUserProjectsEndpoint:
         assert len(data["projects"]) == 0
         assert data["total_projects"] == 0
 
-    def test_get_user_projects_combines_both_sources(
-        self, authenticated_client, team, project, team_member, project_member
-    ):
+    def test_get_user_projects_combines_both_sources(self, authenticated_client, team, project, team_member, project_member):
         """Test that endpoint combines projects from both team and direct membership."""
         from apps.management.models import Project
 
         # Create another project that user is directly member of but not via team
-        other_team = team.__class__.objects.create(
-            name="Other Team", company_id=team.company_id, created_by=team.created_by
-        )
+        other_team = team.__class__.objects.create(name="Other Team", company_id=team.company_id, created_by=team.created_by)
         other_project = Project.objects.create(name="Other Project", team=other_team)
 
         # Add user as team member of other team
