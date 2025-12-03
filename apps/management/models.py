@@ -274,6 +274,59 @@ class GitHubIntegration(RetryableModelMixin, models.Model):
         super().save(*args, **kwargs)
 
 
+class ProjectMember(RetryableModelMixin, models.Model):
+    """
+    Model representing project memberships.
+    Maps to the management.project_members table.
+    Links users directly to projects they're working on.
+    Users must be members of the project's team to be added as project members.
+    """
+
+    ROLE_CHOICES = [
+        ("owner", "Project Owner"),
+        ("contributor", "Contributor"),
+        ("viewer", "Viewer"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="members", db_column="project_id")
+    user_id = models.UUIDField(help_text="Reference to auth.users.id")
+    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default="contributor")
+    joined_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = RetryableManager()
+
+    class Meta:
+        db_table = get_table_name("project_members")
+        ordering = ["-joined_at"]
+        unique_together = ["project", "user_id"]
+        indexes = [
+            models.Index(fields=["project"]),
+            models.Index(fields=["user_id"]),
+            models.Index(fields=["role"]),
+        ]
+
+    def __str__(self):
+        return f"User {self.user_id} - {self.project.name} ({self.role})"
+
+    def clean(self):
+        """Validate that user is a member of the project's team."""
+        from django.core.exceptions import ValidationError
+
+        # Check if user is a member of the project's team
+        if not TeamMember.objects.filter(team=self.project.team, user_id=self.user_id).exists():
+            raise ValidationError(
+                f"User must be a member of team '{self.project.team.name}' to be added to this project."
+            )
+
+    @atomic_with_retry()
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
 class CodeCommit(RetryableModelMixin, models.Model):
     """
     Model representing code commits from integrated repositories.

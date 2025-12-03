@@ -8,6 +8,7 @@ from .models import (
     GitHubIntegration,
     Integration,
     Project,
+    ProjectMember,
     Team,
     TeamMember,
 )
@@ -227,6 +228,93 @@ class TeamMemberSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class ProjectMemberSerializer(serializers.ModelSerializer):
+    """Serializer for ProjectMember model."""
+
+    user_email = serializers.SerializerMethodField()
+    user_name = serializers.SerializerMethodField()
+    project_name = serializers.CharField(source="project.name", read_only=True)
+
+    class Meta:
+        model = ProjectMember
+        fields = [
+            "id",
+            "project",
+            "project_name",
+            "user_id",
+            "user_email",
+            "user_name",
+            "role",
+            "joined_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "project_name",
+            "user_email",
+            "user_name",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_user_email(self, obj):
+        """Get user email from auth service."""
+        if self.context.get("request"):
+            token = getattr(self.context["request"], "auth", None)
+            user_data = AuthServiceIntegration.get_user_by_id(obj.user_id, token)
+            return user_data.get("email") if user_data else "Unknown"
+        return "Unknown"
+
+    def get_user_name(self, obj):
+        """Get user name from auth service."""
+        if self.context.get("request"):
+            token = getattr(self.context["request"], "auth", None)
+            user_data = AuthServiceIntegration.get_user_by_id(obj.user_id, token)
+            if user_data:
+                first_name = user_data.get("first_name", "")
+                last_name = user_data.get("last_name", "")
+                return f"{first_name} {last_name}".strip()
+        return "Unknown User"
+
+    def validate(self, attrs):
+        """Validate project member data."""
+        project = attrs.get("project")
+        user_id = attrs.get("user_id")
+
+        # Only run these validations for creation, not updates
+        if not self.instance:
+            # Check if user is already a member of the project
+            if project and user_id and ProjectMember.objects.filter(project=project, user_id=user_id).exists():
+                raise serializers.ValidationError("User is already a member of this project.")
+
+            # Check if user is a member of the project's team (safeguard)
+            if project and user_id:
+                if not TeamMember.objects.filter(team=project.team, user_id=user_id).exists():
+                    raise serializers.ValidationError(
+                        f"User must be a member of team '{project.team.name}' to be added to this project."
+                    )
+
+            # Validate that the requesting user has permission to add members
+            if self.context.get("request") and project:
+                requesting_user = self.context["request"].user
+                if hasattr(requesting_user, "role") and requesting_user.role != "admin":
+                    # Check if requesting user is a project owner or team lead
+                    is_project_owner = ProjectMember.objects.filter(
+                        project=project, user_id=requesting_user.id, role="owner"
+                    ).exists()
+                    is_team_lead = TeamMember.objects.filter(
+                        team=project.team, user_id=requesting_user.id, role="lead"
+                    ).exists()
+
+                    if not is_project_owner and not is_team_lead:
+                        raise serializers.ValidationError(
+                            "You don't have permission to add members to this project."
+                        )
+
+        return attrs
+
+
 class IntegrationSerializer(serializers.ModelSerializer):
     """Serializer for Integration model."""
 
@@ -380,6 +468,17 @@ class TeamMemberCreateSerializer(serializers.Serializer):
         choices=TeamMember.ROLE_CHOICES,
         default="developer",
         help_text="Role in the team",
+    )
+
+
+class ProjectMemberCreateSerializer(serializers.Serializer):
+    """Serializer for adding project members."""
+
+    user_id = serializers.UUIDField(help_text="User ID to add to the project")
+    role = serializers.ChoiceField(
+        choices=ProjectMember.ROLE_CHOICES,
+        default="contributor",
+        help_text="Role in the project",
     )
 
 

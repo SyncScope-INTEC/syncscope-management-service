@@ -11,6 +11,7 @@ from apps.management.models import (
     GitHubIntegration,
     Integration,
     Project,
+    ProjectMember,
     Team,
     TeamMember,
 )
@@ -154,6 +155,83 @@ class TestTeamMemberModel:
         """Test that default role is 'developer'."""
         member = TeamMember.objects.create(team=team, user_id=mock_user_data["user_id"])
         assert member.role == "developer"
+
+
+@pytest.mark.django_db
+class TestProjectMemberModel:
+
+    def test_create_project_member_success(self, project, team_member):
+        """Test successful project member creation."""
+        member = ProjectMember.objects.create(project=project, user_id=team_member.user_id, role="contributor")
+
+        assert member.project == project
+        assert member.user_id == team_member.user_id
+        assert member.role == "contributor"
+        assert member.id is not None
+        assert member.joined_at is not None
+        assert member.created_at is not None
+        assert member.updated_at is not None
+
+    def test_project_member_str_representation(self, project_member):
+        """Test project member string representation."""
+        expected = f"User {project_member.user_id} - {project_member.project.name} ({project_member.role})"
+        assert str(project_member) == expected
+
+    def test_project_member_unique_constraint(self, project, team_member):
+        """Test that a user can only be a member of a project once."""
+        ProjectMember.objects.create(project=project, user_id=team_member.user_id, role="contributor")
+
+        # Attempting to add the same user again should fail
+        with pytest.raises(IntegrityError):
+            ProjectMember.objects.create(project=project, user_id=team_member.user_id, role="owner")
+
+    def test_project_member_role_choices(self, project, team):
+        """Test valid role choices."""
+        valid_roles = ["owner", "contributor", "viewer"]
+
+        for role in valid_roles:
+            # Create a team member first (required for project membership)
+            user_id = uuid.uuid4()
+            TeamMember.objects.create(team=team, user_id=user_id, role="developer")
+
+            # Now create project member
+            member = ProjectMember.objects.create(project=project, user_id=user_id, role=role)
+            assert member.role == role
+
+    def test_default_role(self, project, team_member):
+        """Test that default role is 'contributor'."""
+        member = ProjectMember.objects.create(project=project, user_id=team_member.user_id)
+        assert member.role == "contributor"
+
+    def test_project_member_requires_team_membership(self, project, mock_user_data):
+        """Test that user must be a team member before joining project."""
+        # Try to create project member without team membership
+        random_user_id = uuid.uuid4()
+
+        # This should raise ValidationError because user is not a team member
+        with pytest.raises(ValidationError):
+            member = ProjectMember(project=project, user_id=random_user_id, role="contributor")
+            member.full_clean()  # This triggers the validation
+
+    def test_project_member_team_validation_on_save(self, project):
+        """Test that validation is enforced on save."""
+        # Try to create project member without team membership
+        random_user_id = uuid.uuid4()
+
+        # This should raise ValidationError because user is not a team member
+        with pytest.raises(ValidationError):
+            ProjectMember.objects.create(project=project, user_id=random_user_id, role="contributor")
+
+    def test_project_member_cascade_delete(self, project, team_member):
+        """Test that project members are deleted when project is deleted."""
+        member = ProjectMember.objects.create(project=project, user_id=team_member.user_id, role="contributor")
+
+        project.delete()
+        assert not ProjectMember.objects.filter(id=member.id).exists()
+
+    def test_project_relationship(self, project_member):
+        """Test project-member relationship."""
+        assert project_member in project_member.project.members.all()
 
 
 @pytest.mark.django_db

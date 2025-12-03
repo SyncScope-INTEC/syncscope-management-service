@@ -19,6 +19,7 @@ from apps.management.models import (
     GitHubIntegration,
     Integration,
     Project,
+    ProjectMember,
     Team,
     TeamMember,
 )
@@ -176,6 +177,26 @@ def team_member(team):
 def team_lead(team, mock_user_data):
     """Create a test team lead."""
     member, created = TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "lead"})
+    return member
+
+
+@pytest.fixture
+@pytest.mark.django_db
+def project_member(project, team_member):
+    """Create a test project member."""
+    member, created = ProjectMember.objects.get_or_create(
+        project=project, user_id=team_member.user_id, defaults={"role": "contributor"}
+    )
+    return member
+
+
+@pytest.fixture
+@pytest.mark.django_db
+def project_owner(project, mock_user_data, team_lead):
+    """Create a test project owner."""
+    member, created = ProjectMember.objects.get_or_create(
+        project=project, user_id=mock_user_data["user_id"], defaults={"role": "owner"}
+    )
     return member
 
 

@@ -22,6 +22,7 @@ from .models import (
     GitHubIntegration,
     Integration,
     Project,
+    ProjectMember,
     Team,
     TeamMember,
 )
@@ -34,6 +35,8 @@ from .serializers import (
     IntegrationSerializer,
     ProjectCreateSerializer,
     ProjectDetailSerializer,
+    ProjectMemberCreateSerializer,
+    ProjectMemberSerializer,
     ProjectSerializer,
     TeamCreateSerializer,
     TeamDetailSerializer,
@@ -392,6 +395,52 @@ class ProjectViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         serializer = CodeCommitSerializer(commits, many=True, context={"request": request})
         return Response(serializer.data)
 
+    @extend_schema(
+        tags=["Projects"],
+        summary="Manage project members",
+        description="Get or add members to a specific project.",
+    )
+    @action(detail=True, methods=["get", "post"])
+    def members(self, request, pk=None):
+        """Manage project members."""
+        project = self.get_object()
+
+        if request.method == "GET":
+            members = ProjectMember.objects.filter(project=project)
+            serializer = ProjectMemberSerializer(members, many=True, context={"request": request})
+            return Response(serializer.data)
+
+        elif request.method == "POST":
+            serializer = ProjectMemberCreateSerializer(data=request.data)
+            if serializer.is_valid():
+                # Check permissions
+                if not self._user_can_manage_project(request.user, project):
+                    return Response(
+                        {"error": "You don't have permission to manage this project."},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+
+                # Validate that user is a member of the project's team
+                user_id = serializer.validated_data["user_id"]
+                if not TeamMember.objects.filter(team=project.team, user_id=user_id).exists():
+                    return Response(
+                        {"error": f"User must be a member of team '{project.team.name}' to be added to this project."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # Create project member
+                ProjectMember.objects.create(
+                    project=project,
+                    user_id=serializer.validated_data["user_id"],
+                    role=serializer.validated_data.get("role", "contributor"),
+                )
+
+                return Response(
+                    {"message": "Project member added successfully."},
+                    status=status.HTTP_201_CREATED,
+                )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     def _user_can_manage_team(self, user, team):
         """Check if user can manage team."""
         if hasattr(user, "role") and user.role == "admin":
@@ -399,6 +448,19 @@ class ProjectViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
 
         if hasattr(user, "id"):
             return TeamMember.objects.filter(team=team, user_id=user.id, role__in=["lead"]).exists()
+
+        return False
+
+    def _user_can_manage_project(self, user, project):
+        """Check if user can manage project."""
+        if hasattr(user, "role") and user.role == "admin":
+            return True
+
+        if hasattr(user, "id"):
+            # Check if user is a project owner or team lead
+            is_project_owner = ProjectMember.objects.filter(project=project, user_id=user.id, role="owner").exists()
+            is_team_lead = TeamMember.objects.filter(team=project.team, user_id=user.id, role="lead").exists()
+            return is_project_owner or is_team_lead
 
         return False
 
@@ -455,6 +517,61 @@ class TeamMemberViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
             return TeamMember.objects.filter(team__in=user_teams)
 
         return TeamMember.objects.none()
+
+
+@extend_schema_view(
+    list=extend_schema(
+        tags=["Project Members"],
+        summary="List project members",
+        description="Get a list of all project members the user has access to.",
+    ),
+    create=extend_schema(
+        tags=["Project Members"],
+        summary="Add project member",
+        description="Add a new member to a project.",
+        request=ProjectMemberCreateSerializer,
+    ),
+    retrieve=extend_schema(
+        tags=["Project Members"],
+        summary="Get project member details",
+        description="Get detailed information about a specific project member.",
+    ),
+    update=extend_schema(
+        tags=["Project Members"],
+        summary="Update project member",
+        description="Update project member role or information.",
+    ),
+    partial_update=extend_schema(
+        tags=["Project Members"],
+        summary="Partially update project member",
+        description="Partially update project member role or information.",
+    ),
+    destroy=extend_schema(
+        tags=["Project Members"],
+        summary="Remove project member",
+        description="Remove a member from a project.",
+    ),
+)
+class ProjectMemberViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
+    """ViewSet for managing project members."""
+
+    serializer_class = ProjectMemberSerializer
+    permission_classes = [permissions.IsAuthenticated, IsProjectMemberOrAdmin]
+
+    def get_queryset(self):
+        """Filter project members by user access."""
+        user = self.request.user
+
+        if hasattr(user, "role") and user.role == "admin":
+            return ProjectMember.objects.all()
+
+        if hasattr(user, "id"):
+            # Get members from projects user has access to
+            user_teams = TeamMember.objects.filter(user_id=user.id).values_list("team", flat=True)
+            user_projects = Project.objects.filter(team__in=user_teams).values_list("id", flat=True)
+            return ProjectMember.objects.filter(project__in=user_projects)
+
+        return ProjectMember.objects.none()
 
 
 @extend_schema_view(
@@ -625,6 +742,56 @@ class CodeCommitViewSet(ServerlessViewMixin, viewsets.ReadOnlyModelViewSet):
             return CodeCommit.objects.filter(project__in=user_projects)
 
         return CodeCommit.objects.none()
+
+
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+@extend_schema(
+    tags=["Projects"],
+    summary="Get user's projects",
+    description="Get all projects for a specific user. User can access their own projects or admins can access any user's projects.",
+)
+def get_user_projects(request, user_id):
+    """
+    API endpoint to get all projects for a specific user.
+    Projects are returned based on:
+    1. Direct project membership (ProjectMember)
+    2. Team membership (TeamMember -> Team -> Projects)
+    """
+    # Permission check
+    requesting_user = request.user
+    if not (hasattr(requesting_user, "role") and requesting_user.role == "admin"):
+        if not (hasattr(requesting_user, "id") and str(requesting_user.id) == str(user_id)):
+            return Response(
+                {"error": "You don't have permission to view this user's projects."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+    try:
+        # Get projects where user is a direct member
+        direct_projects = Project.objects.filter(members__user_id=user_id).distinct()
+
+        # Get projects from teams user is a member of
+        user_teams = TeamMember.objects.filter(user_id=user_id).values_list("team", flat=True)
+        team_projects = Project.objects.filter(team__in=user_teams).distinct()
+
+        # Combine both querysets and remove duplicates
+        all_projects = (direct_projects | team_projects).distinct()
+
+        serializer = ProjectDetailSerializer(all_projects, many=True, context={"request": request})
+        return Response(
+            {
+                "user_id": user_id,
+                "projects": serializer.data,
+                "total_projects": all_projects.count(),
+            }
+        )
+
+    except Exception as e:
+        return Response(
+            {"error": f"Failed to get user projects: {str(e)}", "user_id": user_id, "projects": [], "total_projects": 0},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 @api_view(["GET"])
