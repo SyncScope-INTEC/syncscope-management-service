@@ -794,7 +794,9 @@ class TestGetUserProjectsEndpoint:
         # First make authenticated user a team member
         TeamMember.objects.get_or_create(team=project.team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
         # Then make them a project member
-        ProjectMember.objects.get_or_create(project=project, user_id=mock_user_data["user_id"], defaults={"role": "contributor"})
+        ProjectMember.objects.get_or_create(
+            project=project, user_id=mock_user_data["user_id"], defaults={"role": "contributor"}
+        )
 
         url = reverse("management:get_user_projects", kwargs={"user_id": mock_user_data["user_id"]})
         response = authenticated_client.get(url)
