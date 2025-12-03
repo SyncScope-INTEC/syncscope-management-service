@@ -308,9 +308,7 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
                     ).exists()
 
                     if not is_project_owner and not is_team_lead:
-                        raise serializers.ValidationError(
-                            "You don't have permission to add members to this project."
-                        )
+                        raise serializers.ValidationError("You don't have permission to add members to this project.")
 
         return attrs
 

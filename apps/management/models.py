@@ -317,9 +317,7 @@ class ProjectMember(RetryableModelMixin, models.Model):
 
         # Check if user is a member of the project's team
         if not TeamMember.objects.filter(team=self.project.team, user_id=self.user_id).exists():
-            raise ValidationError(
-                f"User must be a member of team '{self.project.team.name}' to be added to this project."
-            )
+            raise ValidationError(f"User must be a member of team '{self.project.team.name}' to be added to this project.")
 
     @atomic_with_retry()
     def save(self, *args, **kwargs):
