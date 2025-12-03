@@ -165,7 +165,7 @@ class TestProjectMemberModel:
         member = ProjectMember.objects.create(project=project, user_id=team_member.user_id, role="contributor")
 
         assert member.project == project
-        assert member.user_id == team_member.user_id
+        assert str(member.user_id) == str(team_member.user_id)
         assert member.role == "contributor"
         assert member.id is not None
         assert member.joined_at is not None
@@ -181,8 +181,8 @@ class TestProjectMemberModel:
         """Test that a user can only be a member of a project once."""
         ProjectMember.objects.create(project=project, user_id=team_member.user_id, role="contributor")
 
-        # Attempting to add the same user again should fail
-        with pytest.raises(IntegrityError):
+        # Attempting to add the same user again should fail (ValidationError due to full_clean validation)
+        with pytest.raises(ValidationError):
             ProjectMember.objects.create(project=project, user_id=team_member.user_id, role="owner")
 
     def test_project_member_role_choices(self, project, team):
