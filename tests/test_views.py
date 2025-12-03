@@ -698,3 +698,157 @@ class TestHealthEndpoints:
         assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
         data = response.json()
         assert data["status"] == "not ready"
+
+
+@pytest.mark.django_db
+class TestProjectMemberViewSet:
+    """Test ProjectMember API endpoints."""
+
+    def test_list_project_members(self, authenticated_client, project, project_member):
+        """Test listing project members."""
+        url = reverse("projectmember-list")
+        response = authenticated_client.get(url, {"project": project.id})
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) >= 1
+        assert any(str(pm["user_id"]) == str(project_member.user_id) for pm in data)
+
+    def test_create_project_member_success(self, authenticated_client, project, team_member, mock_user_data):
+        """Test creating a project member successfully."""
+        url = reverse("projectmember-list")
+        data = {"project": str(project.id), "user_id": str(team_member.user_id), "role": "contributor"}
+
+        response = authenticated_client.post(url, data, format="json")
+
+        assert response.status_code == status.HTTP_201_CREATED
+        response_data = response.json()
+        assert str(response_data["user_id"]) == str(team_member.user_id)
+        assert response_data["role"] == "contributor"
+
+    def test_create_project_member_not_team_member(self, authenticated_client, project, mock_user_data):
+        """Test creating project member fails when user is not a team member."""
+        import uuid
+
+        url = reverse("projectmember-list")
+        random_user_id = uuid.uuid4()
+        data = {"project": str(project.id), "user_id": str(random_user_id), "role": "contributor"}
+
+        response = authenticated_client.post(url, data, format="json")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_create_project_member_duplicate(self, authenticated_client, project, project_member):
+        """Test creating duplicate project member fails."""
+        url = reverse("projectmember-list")
+        data = {"project": str(project.id), "user_id": str(project_member.user_id), "role": "owner"}
+
+        response = authenticated_client.post(url, data, format="json")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_retrieve_project_member(self, authenticated_client, project_member):
+        """Test retrieving a specific project member."""
+        url = reverse("projectmember-detail", kwargs={"pk": project_member.id})
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert str(data["user_id"]) == str(project_member.user_id)
+        assert data["role"] == project_member.role
+
+    def test_update_project_member(self, authenticated_client, project_member):
+        """Test updating project member role."""
+        url = reverse("projectmember-detail", kwargs={"pk": project_member.id})
+        data = {"role": "viewer"}
+
+        response = authenticated_client.patch(url, data, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        response_data = response.json()
+        assert response_data["role"] == "viewer"
+
+    def test_delete_project_member(self, authenticated_client, project, team_member):
+        """Test deleting a project member."""
+        from apps.management.models import ProjectMember
+
+        # Create a project member to delete
+        member = ProjectMember.objects.create(project=project, user_id=team_member.user_id, role="contributor")
+
+        url = reverse("projectmember-detail", kwargs={"pk": member.id})
+        response = authenticated_client.delete(url)
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not ProjectMember.objects.filter(id=member.id).exists()
+
+
+@pytest.mark.django_db
+class TestGetUserProjectsEndpoint:
+    """Test get_user_projects API endpoint."""
+
+    def test_get_user_projects_with_direct_membership(self, authenticated_client, project, project_member):
+        """Test getting projects where user is a direct member."""
+        url = reverse("get_user_projects", kwargs={"user_id": project_member.user_id})
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "projects" in data
+        assert len(data["projects"]) >= 1
+        assert any(p["id"] == str(project.id) for p in data["projects"])
+        assert data["user_id"] == str(project_member.user_id)
+
+    def test_get_user_projects_with_team_membership(self, authenticated_client, team, project, team_member):
+        """Test getting projects via team membership."""
+        url = reverse("get_user_projects", kwargs={"user_id": team_member.user_id})
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "projects" in data
+        assert len(data["projects"]) >= 1
+        assert any(p["id"] == str(project.id) for p in data["projects"])
+
+    def test_get_user_projects_no_projects(self, authenticated_client, mock_user_data):
+        """Test getting projects for user with no project access."""
+        import uuid
+
+        random_user_id = uuid.uuid4()
+        url = reverse("get_user_projects", kwargs={"user_id": random_user_id})
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "projects" in data
+        assert len(data["projects"]) == 0
+        assert data["total_projects"] == 0
+
+    def test_get_user_projects_combines_both_sources(
+        self, authenticated_client, team, project, team_member, project_member
+    ):
+        """Test that endpoint combines projects from both team and direct membership."""
+        from apps.management.models import Project
+
+        # Create another project that user is directly member of but not via team
+        other_team = team.__class__.objects.create(
+            name="Other Team", company_id=team.company_id, created_by=team.created_by
+        )
+        other_project = Project.objects.create(name="Other Project", team=other_team)
+
+        # Add user as team member of other team
+        from apps.management.models import TeamMember, ProjectMember
+
+        TeamMember.objects.create(team=other_team, user_id=project_member.user_id, role="developer")
+
+        # Add user as project member of other project
+        ProjectMember.objects.create(project=other_project, user_id=project_member.user_id, role="contributor")
+
+        url = reverse("get_user_projects", kwargs={"user_id": project_member.user_id})
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data["projects"]) >= 2
+        project_ids = [p["id"] for p in data["projects"]]
+        assert str(project.id) in project_ids
+        assert str(other_project.id) in project_ids
