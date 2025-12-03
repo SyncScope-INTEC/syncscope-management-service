@@ -706,7 +706,7 @@ class TestProjectMemberViewSet:
 
     def test_list_project_members(self, authenticated_client, project, project_member):
         """Test listing project members."""
-        url = reverse("projectmember-list")
+        url = reverse("management:projectmember-list")
         response = authenticated_client.get(url, {"project": project.id})
 
         assert response.status_code == status.HTTP_200_OK
@@ -716,7 +716,7 @@ class TestProjectMemberViewSet:
 
     def test_create_project_member_success(self, authenticated_client, project, team_member, mock_user_data):
         """Test creating a project member successfully."""
-        url = reverse("projectmember-list")
+        url = reverse("management:projectmember-list")
         data = {"project": str(project.id), "user_id": str(team_member.user_id), "role": "contributor"}
 
         response = authenticated_client.post(url, data, format="json")
@@ -730,7 +730,7 @@ class TestProjectMemberViewSet:
         """Test creating project member fails when user is not a team member."""
         import uuid
 
-        url = reverse("projectmember-list")
+        url = reverse("management:projectmember-list")
         random_user_id = uuid.uuid4()
         data = {"project": str(project.id), "user_id": str(random_user_id), "role": "contributor"}
 
@@ -740,7 +740,7 @@ class TestProjectMemberViewSet:
 
     def test_create_project_member_duplicate(self, authenticated_client, project, project_member):
         """Test creating duplicate project member fails."""
-        url = reverse("projectmember-list")
+        url = reverse("management:projectmember-list")
         data = {"project": str(project.id), "user_id": str(project_member.user_id), "role": "owner"}
 
         response = authenticated_client.post(url, data, format="json")
@@ -749,7 +749,7 @@ class TestProjectMemberViewSet:
 
     def test_retrieve_project_member(self, authenticated_client, project_member):
         """Test retrieving a specific project member."""
-        url = reverse("projectmember-detail", kwargs={"pk": project_member.id})
+        url = reverse("management:projectmember-detail", kwargs={"pk": project_member.id})
         response = authenticated_client.get(url)
 
         assert response.status_code == status.HTTP_200_OK
@@ -759,7 +759,7 @@ class TestProjectMemberViewSet:
 
     def test_update_project_member(self, authenticated_client, project_member):
         """Test updating project member role."""
-        url = reverse("projectmember-detail", kwargs={"pk": project_member.id})
+        url = reverse("management:projectmember-detail", kwargs={"pk": project_member.id})
         data = {"role": "viewer"}
 
         response = authenticated_client.patch(url, data, format="json")
@@ -775,7 +775,7 @@ class TestProjectMemberViewSet:
         # Create a project member to delete
         member = ProjectMember.objects.create(project=project, user_id=team_member.user_id, role="contributor")
 
-        url = reverse("projectmember-detail", kwargs={"pk": member.id})
+        url = reverse("management:projectmember-detail", kwargs={"pk": member.id})
         response = authenticated_client.delete(url)
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -788,7 +788,7 @@ class TestGetUserProjectsEndpoint:
 
     def test_get_user_projects_with_direct_membership(self, authenticated_client, project, project_member):
         """Test getting projects where user is a direct member."""
-        url = reverse("get_user_projects", kwargs={"user_id": project_member.user_id})
+        url = reverse("management:get_user_projects", kwargs={"user_id": project_member.user_id})
         response = authenticated_client.get(url)
 
         assert response.status_code == status.HTTP_200_OK
@@ -800,7 +800,7 @@ class TestGetUserProjectsEndpoint:
 
     def test_get_user_projects_with_team_membership(self, authenticated_client, team, project, team_member):
         """Test getting projects via team membership."""
-        url = reverse("get_user_projects", kwargs={"user_id": team_member.user_id})
+        url = reverse("management:get_user_projects", kwargs={"user_id": team_member.user_id})
         response = authenticated_client.get(url)
 
         assert response.status_code == status.HTTP_200_OK
@@ -814,7 +814,7 @@ class TestGetUserProjectsEndpoint:
         import uuid
 
         random_user_id = uuid.uuid4()
-        url = reverse("get_user_projects", kwargs={"user_id": random_user_id})
+        url = reverse("management:get_user_projects", kwargs={"user_id": random_user_id})
         response = authenticated_client.get(url)
 
         assert response.status_code == status.HTTP_200_OK
@@ -839,7 +839,7 @@ class TestGetUserProjectsEndpoint:
         # Add user as project member of other project
         ProjectMember.objects.create(project=other_project, user_id=project_member.user_id, role="contributor")
 
-        url = reverse("get_user_projects", kwargs={"user_id": project_member.user_id})
+        url = reverse("management:get_user_projects", kwargs={"user_id": project_member.user_id})
         response = authenticated_client.get(url)
 
         assert response.status_code == status.HTTP_200_OK
