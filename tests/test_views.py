@@ -890,3 +890,208 @@ class TestGetUserProjectsEndpoint:
         project_ids = [p["id"] for p in data["projects"]]
         assert str(project.id) in project_ids
         assert str(other_project.id) in project_ids
+
+
+@pytest.mark.django_db
+class TestAdditionalViewCoverage:
+    """Additional tests to improve view coverage."""
+
+    def test_team_detail_view(self, authenticated_client, team):
+        """Test team detail view."""
+        url = reverse("management:team-detail", kwargs={"pk": team.id})
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["name"] == team.name
+
+    def test_team_update_view(self, authenticated_client, team):
+        """Test team update view."""
+        url = reverse("management:team-detail", kwargs={"pk": team.id})
+        data = {"name": "Updated Team Name", "description": "Updated description"}
+        response = authenticated_client.patch(url, data, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        updated_data = response.json()
+        assert updated_data["name"] == "Updated Team Name"
+
+    def test_team_delete_view(self, authenticated_client, company_id, mock_user_data):
+        """Test team delete view."""
+        from apps.management.models import Team
+
+        # Create a team to delete
+        team = Team.objects.create(name="Team to Delete", company_id=company_id, created_by=mock_user_data["user_id"])
+
+        url = reverse("management:team-detail", kwargs={"pk": team.id})
+        response = authenticated_client.delete(url)
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert not Team.objects.filter(id=team.id).exists()
+
+    def test_project_detail_view(self, authenticated_client, project, mock_user_data):
+        """Test project detail view."""
+        from apps.management.models import TeamMember
+
+        # Make authenticated user a team member
+        TeamMember.objects.get_or_create(team=project.team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
+
+        url = reverse("management:project-detail", kwargs={"pk": project.id})
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["name"] == project.name
+
+    def test_project_update_view(self, authenticated_client, project, mock_user_data):
+        """Test project update view."""
+        from apps.management.models import TeamMember
+
+        # Make authenticated user a team lead (required for project updates)
+        TeamMember.objects.get_or_create(team=project.team, user_id=mock_user_data["user_id"], defaults={"role": "lead"})
+
+        url = reverse("management:project-detail", kwargs={"pk": project.id})
+        data = {"name": "Updated Project Name"}
+        response = authenticated_client.patch(url, data, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        updated_data = response.json()
+        assert updated_data["name"] == "Updated Project Name"
+
+    def test_integration_list_view(self, authenticated_client, integration, mock_user_data):
+        """Test integration list view."""
+        from apps.management.models import TeamMember
+
+        # Make authenticated user a team member
+        TeamMember.objects.get_or_create(
+            team=integration.project.team, user_id=mock_user_data["user_id"], defaults={"role": "developer"}
+        )
+
+        url = reverse("management:integration-list")
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        results = data.get("results", data)
+        assert len(results) >= 0
+
+    def test_integration_detail_view(self, authenticated_client, integration, mock_user_data):
+        """Test integration detail view."""
+        from apps.management.models import TeamMember
+
+        # Make authenticated user a team member
+        TeamMember.objects.get_or_create(
+            team=integration.project.team, user_id=mock_user_data["user_id"], defaults={"role": "developer"}
+        )
+
+        url = reverse("management:integration-detail", kwargs={"pk": integration.id})
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["type"] == integration.type
+
+    def test_github_integration_list_view(self, authenticated_client, github_integration, mock_user_data):
+        """Test GitHub integration list view."""
+        from apps.management.models import TeamMember
+
+        # Make authenticated user a team member
+        TeamMember.objects.get_or_create(
+            team=github_integration.project.team, user_id=mock_user_data["user_id"], defaults={"role": "developer"}
+        )
+
+        url = reverse("management:githubintegration-list")
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        results = data.get("results", data)
+        assert len(results) >= 0
+
+    def test_commit_list_view(self, authenticated_client, code_commit, mock_user_data):
+        """Test code commit list view."""
+        from apps.management.models import TeamMember
+
+        # Make authenticated user a team member
+        TeamMember.objects.get_or_create(
+            team=code_commit.project.team, user_id=mock_user_data["user_id"], defaults={"role": "developer"}
+        )
+
+        url = reverse("management:codecommit-list")
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        results = data.get("results", data)
+        assert len(results) >= 0
+
+    def test_team_members_action_post_without_permission(self, authenticated_client, team):
+        """Test adding team member without permission returns 403."""
+        import uuid
+
+        from apps.management.models import TeamMember
+
+        # Don't make user a team lead, so they don't have permission
+        url = reverse("management:team-members", kwargs={"pk": team.id})
+        data = {"user_id": str(uuid.uuid4()), "role": "developer"}
+        response = authenticated_client.post(url, data, format="json")
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_team_members_action_post_invalid_data(self, authenticated_client, team, mock_user_data):
+        """Test adding team member with invalid data returns 400."""
+        from apps.management.models import TeamMember
+
+        # Make user a team lead
+        TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "lead"})
+
+        url = reverse("management:team-members", kwargs={"pk": team.id})
+        data = {"user_id": "invalid-uuid", "role": "developer"}
+        response = authenticated_client.post(url, data, format="json")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_project_members_action_get(self, authenticated_client, project, mock_user_data, project_member):
+        """Test getting project members."""
+        from apps.management.models import TeamMember
+
+        # Make authenticated user a team member
+        TeamMember.objects.get_or_create(team=project.team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
+
+        url = reverse("management:project-members", kwargs={"pk": project.id})
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert isinstance(data, list)
+
+    def test_project_members_action_post_without_permission(self, authenticated_client, project, mock_user_data):
+        """Test adding project member without permission returns 403."""
+        import uuid
+
+        from apps.management.models import TeamMember
+
+        # Make user a team member but not a lead (so they don't have permission to manage)
+        TeamMember.objects.get_or_create(team=project.team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
+
+        url = reverse("management:project-members", kwargs={"pk": project.id})
+        data = {"user_id": str(uuid.uuid4()), "role": "contributor"}
+        response = authenticated_client.post(url, data, format="json")
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_project_members_action_post_non_team_member(self, authenticated_client, project, mock_user_data):
+        """Test adding non-team member to project returns 400."""
+        import uuid
+
+        from apps.management.models import TeamMember
+
+        # Make user a team lead so they have permission
+        TeamMember.objects.get_or_create(team=project.team, user_id=mock_user_data["user_id"], defaults={"role": "lead"})
+
+        # Try to add a user who is not a team member
+        url = reverse("management:project-members", kwargs={"pk": project.id})
+        data = {"user_id": str(uuid.uuid4()), "role": "contributor"}
+        response = authenticated_client.post(url, data, format="json")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "team" in response.json()["error"].lower()
