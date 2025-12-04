@@ -10,6 +10,7 @@ from .models import (
     GitHubIntegration,
     Integration,
     Project,
+    ProjectMember,
     Team,
     TeamMember,
 )
@@ -212,6 +213,17 @@ class CodeCommitInline(admin.TabularInline):
         return False
 
 
+class ProjectMemberInline(admin.TabularInline):
+    """Inline admin for project members."""
+
+    model = ProjectMember
+    extra = 1
+    readonly_fields = ("joined_at", "created_at", "updated_at")
+    fields = ("user_id", "role", "joined_at")
+    verbose_name = "Project Member"
+    verbose_name_plural = "Project Members"
+
+
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
     """Admin interface for Project model."""
@@ -227,7 +239,7 @@ class ProjectAdmin(admin.ModelAdmin):
     list_filter = ("team", "created_at", "updated_at")
     search_fields = ("name", "description", "repository_url", "url")
     readonly_fields = ("id", "created_at", "updated_at")
-    inlines = [IntegrationInline, GitHubIntegrationInline, CodeCommitInline]
+    inlines = [IntegrationInline, GitHubIntegrationInline, CodeCommitInline, ProjectMemberInline]
 
     fieldsets = (
         ("Basic Information", {"fields": ("name", "description", "team")}),
