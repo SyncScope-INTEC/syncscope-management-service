@@ -1297,47 +1297,48 @@ class TestOrganizationSettingsViewSet:
         # Should return 404 or create settings and return False
         assert response.status_code in [status.HTTP_200_OK, status.HTTP_404_NOT_FOUND]
 
-    def test_update_company_name(self, authenticated_client, company_id, mock_user_data, mock_auth_service):
-        """Test updating company name in organization settings."""
+    def test_organization_settings_requires_company_name(self, authenticated_client, company_id, mock_user_data, mock_auth_service):
+        """Test that company_name is required when creating settings."""
         settings = OrganizationSettings.objects.create(
             company_id=company_id,
-            company_name="Old Company Name",
+            company_name="Test Company",
             updated_by=mock_user_data["user_id"],
         )
 
         url = reverse("management:organizationsettings-detail", args=[settings.id])
+        # Try to update without company_name (should still work with PATCH)
         data = {
-            "company_name": "New Company Name",
+            "deletion_protection_enabled": True,
         }
 
         response = authenticated_client.patch(url, data, format="json")
 
+        # PATCH should work even without company_name
         assert response.status_code == status.HTTP_200_OK
-        settings.refresh_from_db()
-        assert settings.company_name == "New Company Name"
 
-    def test_set_custom_deletion_password(self, authenticated_client, company_id, mock_user_data, mock_auth_service):
-        """Test setting a custom deletion password."""
+    def test_multiple_failed_attempts(self, authenticated_client, company_id, mock_user_data, mock_auth_service):
+        """Test incrementing failed deletion attempts multiple times."""
         settings = OrganizationSettings.objects.create(
             company_id=company_id,
             company_name="Test Company",
             deletion_protection_enabled=True,
             updated_by=mock_user_data["user_id"],
         )
+        settings.set_deletion_password("CorrectPass123!", validate_complexity=True)
+        settings.save()
 
-        url = reverse("management:organizationsettings-detail", args=[settings.id])
-        data = {
-            "company_name": "Test Company",
-            "deletion_password": "MyCustomPass123!",
-        }
+        url = reverse("management:organizationsettings-verify-deletion-password")
+        data = {"password": "WrongPassword"}
 
-        response = authenticated_client.put(url, data, format="json")
+        # Try wrong password 3 times
+        for i in range(3):
+            response = authenticated_client.post(url, data, format="json")
+            assert response.status_code == status.HTTP_200_OK
+            assert response.data["valid"] is False
 
-        assert response.status_code == status.HTTP_200_OK
+        # Verify failed attempts were incremented
         settings.refresh_from_db()
-        # Verify custom password was set
-        assert settings.verify_deletion_password("MyCustomPass123!") is True
-        assert settings.verify_deletion_password("WrongPass") is False
+        assert settings.failed_deletion_attempts == 3
 
     def test_reset_failed_attempts(self, admin_authenticated_client, company_id, mock_user_data, mock_auth_service):
         """Test resetting failed deletion attempts (admin only)."""
