@@ -1297,7 +1297,9 @@ class TestOrganizationSettingsViewSet:
         # Should return 404 or create settings and return False
         assert response.status_code in [status.HTTP_200_OK, status.HTTP_404_NOT_FOUND]
 
-    def test_organization_settings_requires_company_name(self, authenticated_client, company_id, mock_user_data, mock_auth_service):
+    def test_organization_settings_requires_company_name(
+        self, authenticated_client, company_id, mock_user_data, mock_auth_service
+    ):
         """Test that company_name is required when creating settings."""
         settings = OrganizationSettings.objects.create(
             company_id=company_id,
