@@ -1112,7 +1112,7 @@ class TestOrganizationSettingsViewSet:
         # Verify settings were created
         assert OrganizationSettings.objects.filter(company_id=company_id).exists()
 
-    def test_get_organization_settings_existing(self, authenticated_client, company_id, mock_auth_service):
+    def test_get_organization_settings_existing(self, authenticated_client, company_id, mock_user_data, mock_auth_service):
         """Test getting existing organization settings."""
         # Create settings first
         settings = OrganizationSettings.objects.create(
@@ -1136,7 +1136,7 @@ class TestOrganizationSettingsViewSet:
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_update_organization_settings(self, authenticated_client, company_id, mock_auth_service):
+    def test_update_organization_settings(self, authenticated_client, company_id, mock_user_data, mock_auth_service):
         """Test updating organization settings."""
         settings = OrganizationSettings.objects.create(
             company_id=company_id,
@@ -1158,7 +1158,7 @@ class TestOrganizationSettingsViewSet:
         assert settings.deletion_protection_enabled is True
         assert settings.deletion_password_hash is not None
 
-    def test_verify_deletion_password_success(self, authenticated_client, company_id, mock_auth_service):
+    def test_verify_deletion_password_success(self, authenticated_client, company_id, mock_user_data, mock_auth_service):
         """Test successful password verification."""
         settings = OrganizationSettings.objects.create(
             company_id=company_id,
@@ -1177,7 +1177,7 @@ class TestOrganizationSettingsViewSet:
         assert response.status_code == status.HTTP_200_OK
         assert response.data["valid"] is True
 
-    def test_verify_deletion_password_failure(self, authenticated_client, company_id, mock_auth_service):
+    def test_verify_deletion_password_failure(self, authenticated_client, company_id, mock_user_data, mock_auth_service):
         """Test password verification with wrong password."""
         settings = OrganizationSettings.objects.create(
             company_id=company_id,
@@ -1200,7 +1200,7 @@ class TestOrganizationSettingsViewSet:
         settings.refresh_from_db()
         assert settings.failed_deletion_attempts == 1
 
-    def test_reset_failed_attempts(self, authenticated_client, company_id, mock_auth_service):
+    def test_reset_failed_attempts(self, authenticated_client, company_id, mock_user_data, mock_auth_service):
         """Test resetting failed deletion attempts."""
         settings = OrganizationSettings.objects.create(
             company_id=company_id,
