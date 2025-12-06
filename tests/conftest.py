@@ -129,8 +129,7 @@ def company_id(base_user_data):
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def team(company_id, mock_user_data):
+def team(company_id, mock_user_data, db):
     """Create a test team."""
     return Team.objects.create(
         name="Test Team",
@@ -141,8 +140,7 @@ def team(company_id, mock_user_data):
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def team_with_lead(team, mock_user_data):
+def team_with_lead(team, mock_user_data, db):
     """Create a team with a team lead member."""
     # Use get_or_create to avoid UNIQUE constraint issues
     member, created = TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "lead"})
@@ -150,8 +148,7 @@ def team_with_lead(team, mock_user_data):
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def project(team):
+def project(team, db):
     """Create a test project."""
     return Project.objects.create(
         name="Test Project",
@@ -163,8 +160,7 @@ def project(team):
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def team_member(team):
+def team_member(team, db):
     """Create a test team member."""
     # Use a different user_id to avoid conflicts
     user_id = "550e8400-e29b-41d4-a716-446655440004"
@@ -173,16 +169,14 @@ def team_member(team):
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def team_lead(team, mock_user_data):
+def team_lead(team, mock_user_data, db):
     """Create a test team lead."""
     member, created = TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "lead"})
     return member
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def project_member(project, team_member):
+def project_member(project, team_member, db):
     """Create a test project member."""
     member, created = ProjectMember.objects.get_or_create(
         project=project, user_id=team_member.user_id, defaults={"role": "contributor"}
@@ -191,8 +185,7 @@ def project_member(project, team_member):
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def project_owner(project, mock_user_data, team_lead):
+def project_owner(project, mock_user_data, team_lead, db):
     """Create a test project owner."""
     member, created = ProjectMember.objects.get_or_create(
         project=project, user_id=mock_user_data["user_id"], defaults={"role": "owner"}
@@ -201,8 +194,7 @@ def project_owner(project, mock_user_data, team_lead):
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def integration(project):
+def integration(project, db):
     """Create a test integration."""
     return Integration.objects.create(
         project=project,
@@ -213,8 +205,7 @@ def integration(project):
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def github_integration(project):
+def github_integration(project, db):
     """Create a test GitHub integration."""
     return GitHubIntegration.objects.create(
         project=project,
@@ -226,8 +217,7 @@ def github_integration(project):
 
 
 @pytest.fixture
-@pytest.mark.django_db
-def code_commit(project):
+def code_commit(project, db):
     """Create a test code commit."""
     return CodeCommit.objects.create(
         project=project,
