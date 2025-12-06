@@ -455,3 +455,119 @@ class TestAdminIntegration:
 
         integration_admin = IntegrationAdmin(Integration, admin_site)
         assert len(integration_admin.list_filter) > 0
+
+
+@pytest.mark.django_db
+class TestOrganizationSettingsForm:
+    """Test OrganizationSettingsForm validation."""
+
+    def test_form_valid_password(self, company_id, base_user_data):
+        """Test form with valid password."""
+        from datetime import datetime
+
+        from apps.management.admin import OrganizationSettingsForm
+
+        form_data = {
+            "company_id": str(company_id),
+            "company_name": "Test Company",
+            "deletion_protection_enabled": True,
+            "new_deletion_password": "ValidPass123!",
+            "updated_by": base_user_data["user_id"],
+            "failed_deletion_attempts": 0,
+            "created_at": datetime.now(),
+        }
+        form = OrganizationSettingsForm(data=form_data)
+        assert form.is_valid(), f"Form errors: {form.errors}"
+
+    def test_form_password_too_short(self, company_id, base_user_data):
+        """Test form with password too short."""
+        from datetime import datetime
+
+        from apps.management.admin import OrganizationSettingsForm
+
+        form_data = {
+            "company_id": str(company_id),
+            "company_name": "Test Company",
+            "deletion_protection_enabled": True,
+            "new_deletion_password": "Short1!",
+            "updated_by": base_user_data["user_id"],
+            "failed_deletion_attempts": 0,
+            "created_at": datetime.now(),
+        }
+        form = OrganizationSettingsForm(data=form_data)
+        assert not form.is_valid()
+        assert "new_deletion_password" in form.errors
+
+    def test_form_password_no_uppercase(self, company_id, base_user_data):
+        """Test form with password missing uppercase."""
+        from datetime import datetime
+
+        from apps.management.admin import OrganizationSettingsForm
+
+        form_data = {
+            "company_id": str(company_id),
+            "company_name": "Test Company",
+            "deletion_protection_enabled": True,
+            "new_deletion_password": "validpass123!",
+            "updated_by": base_user_data["user_id"],
+            "failed_deletion_attempts": 0,
+            "created_at": datetime.now(),
+        }
+        form = OrganizationSettingsForm(data=form_data)
+        assert not form.is_valid()
+        assert "new_deletion_password" in form.errors
+
+    def test_form_password_no_number(self, company_id, base_user_data):
+        """Test form with password missing number."""
+        from datetime import datetime
+
+        from apps.management.admin import OrganizationSettingsForm
+
+        form_data = {
+            "company_id": str(company_id),
+            "company_name": "Test Company",
+            "deletion_protection_enabled": True,
+            "new_deletion_password": "ValidPass!",
+            "updated_by": base_user_data["user_id"],
+            "failed_deletion_attempts": 0,
+            "created_at": datetime.now(),
+        }
+        form = OrganizationSettingsForm(data=form_data)
+        assert not form.is_valid()
+        assert "new_deletion_password" in form.errors
+
+    def test_form_password_no_special_char(self, company_id, base_user_data):
+        """Test form with password missing special character."""
+        from datetime import datetime
+
+        from apps.management.admin import OrganizationSettingsForm
+
+        form_data = {
+            "company_id": str(company_id),
+            "company_name": "Test Company",
+            "deletion_protection_enabled": True,
+            "new_deletion_password": "ValidPass123",
+            "updated_by": base_user_data["user_id"],
+            "failed_deletion_attempts": 0,
+            "created_at": datetime.now(),
+        }
+        form = OrganizationSettingsForm(data=form_data)
+        assert not form.is_valid()
+        assert "new_deletion_password" in form.errors
+
+    def test_form_missing_company_name(self, company_id, base_user_data):
+        """Test form with missing company name."""
+        from datetime import datetime
+
+        from apps.management.admin import OrganizationSettingsForm
+
+        form_data = {
+            "company_id": str(company_id),
+            "deletion_protection_enabled": False,
+            "updated_by": base_user_data["user_id"],
+            "failed_deletion_attempts": 0,
+            "created_at": datetime.now(),
+        }
+        form = OrganizationSettingsForm(data=form_data)
+        assert not form.is_valid()
+        assert "company_name" in form.errors
