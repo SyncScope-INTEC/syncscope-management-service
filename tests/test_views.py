@@ -10,6 +10,7 @@ from apps.management.models import (
     CodeCommit,
     GitHubIntegration,
     Integration,
+    OrganizationSettings,
     Project,
     Team,
     TeamMember,
@@ -1095,3 +1096,122 @@ class TestAdditionalViewCoverage:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "team" in response.json()["error"].lower()
+
+
+@pytest.mark.django_db
+class TestOrganizationSettingsViewSet:
+
+    def test_get_organization_settings_auto_create(self, authenticated_client, company_id, mock_user_data, mock_auth_service):
+        """Test that organization settings are auto-created if they don't exist."""
+        url = reverse("management:organizationsettings-list")
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data) >= 1
+
+        # Verify settings were created
+        assert OrganizationSettings.objects.filter(company_id=company_id).exists()
+
+    def test_get_organization_settings_existing(self, authenticated_client, company_id, mock_auth_service):
+        """Test getting existing organization settings."""
+        # Create settings first
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            deletion_protection_enabled=True,
+            updated_by=mock_user_data["user_id"],
+        )
+
+        url = reverse("management:organizationsettings-list")
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data[0]["company_id"] == str(company_id)
+        assert response.data[0]["deletion_protection_enabled"] is True
+
+    def test_get_organization_settings_unauthenticated(self, api_client):
+        """Test that unauthenticated users cannot access settings."""
+        url = reverse("management:organizationsettings-list")
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_update_organization_settings(self, authenticated_client, company_id, mock_auth_service):
+        """Test updating organization settings."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            deletion_protection_enabled=False,
+            updated_by=mock_user_data["user_id"],
+        )
+
+        url = reverse("management:organizationsettings-detail", args=[settings.id])
+        data = {
+            "deletion_protection_enabled": True,
+            "deletion_password": "NewPassword123!",
+        }
+
+        response = authenticated_client.patch(url, data, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        settings.refresh_from_db()
+        assert settings.deletion_protection_enabled is True
+        assert settings.deletion_password_hash is not None
+
+    def test_verify_deletion_password_success(self, authenticated_client, company_id, mock_auth_service):
+        """Test successful password verification."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            deletion_protection_enabled=True,
+            updated_by=mock_user_data["user_id"],
+        )
+        settings.set_deletion_password("ValidPass123!", validate_complexity=True)
+        settings.save()
+
+        url = reverse("management:organizationsettings-verify-deletion-password")
+        data = {"password": "ValidPass123!"}
+
+        response = authenticated_client.post(url, data, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["valid"] is True
+
+    def test_verify_deletion_password_failure(self, authenticated_client, company_id, mock_auth_service):
+        """Test password verification with wrong password."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            deletion_protection_enabled=True,
+            updated_by=mock_user_data["user_id"],
+        )
+        settings.set_deletion_password("ValidPass123!", validate_complexity=True)
+        settings.save()
+
+        url = reverse("management:organizationsettings-verify-deletion-password")
+        data = {"password": "WrongPassword123!"}
+
+        response = authenticated_client.post(url, data, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["valid"] is False
+
+        # Verify failed attempt was recorded
+        settings.refresh_from_db()
+        assert settings.failed_deletion_attempts == 1
+
+    def test_reset_failed_attempts(self, authenticated_client, company_id, mock_auth_service):
+        """Test resetting failed deletion attempts."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            failed_deletion_attempts=10,
+            updated_by=mock_user_data["user_id"],
+        )
+
+        url = reverse("management:organizationsettings-reset-failed-attempts", args=[settings.id])
+        response = authenticated_client.post(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        settings.refresh_from_db()
+        assert settings.failed_deletion_attempts == 0

@@ -10,6 +10,7 @@ from apps.management.models import (
     CodeCommit,
     GitHubIntegration,
     Integration,
+    OrganizationSettings,
     Project,
     ProjectMember,
     Team,
@@ -456,3 +457,219 @@ class TestCodeCommitModel:
         commits = list(CodeCommit.objects.all())
         assert commits[0] == commit2  # Newest first
         assert commits[1] == commit1
+
+
+@pytest.mark.django_db
+class TestOrganizationSettingsModel:
+
+    def test_create_organization_settings_success(self, company_id, mock_user_data):
+        """Test successful organization settings creation."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            deletion_protection_enabled=True,
+            updated_by=mock_user_data["user_id"],
+        )
+
+        assert settings.company_id == company_id
+        assert settings.company_name == "Test Company"
+        assert settings.deletion_protection_enabled is True
+        # When protection is enabled, default password is auto-set
+        assert settings.deletion_password_hash is not None
+        assert settings.failed_deletion_attempts == 0
+        assert settings.id is not None
+        assert settings.created_at is not None
+        assert settings.updated_at is not None
+
+    def test_organization_settings_str_representation(self, company_id, mock_user_data):
+        """Test organization settings string representation."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            updated_by=mock_user_data["user_id"],
+        )
+        expected = f"Settings for Test Company"
+        assert str(settings) == expected
+
+    def test_organization_settings_unique_company(self, company_id, mock_user_data):
+        """Test that only one settings object can exist per company."""
+        OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            updated_by=mock_user_data["user_id"],
+        )
+
+        # Creating duplicate should fail
+        with pytest.raises(IntegrityError):
+            OrganizationSettings.objects.create(
+                company_id=company_id,
+                company_name="Test Company",
+                updated_by=mock_user_data["user_id"],
+            )
+
+    def test_set_deletion_password_with_validation(self, company_id, mock_user_data):
+        """Test setting deletion password with complexity validation."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            updated_by=mock_user_data["user_id"],
+        )
+
+        # Valid password
+        settings.set_deletion_password("ValidPass123!", validate_complexity=True)
+        assert settings.deletion_password_hash is not None
+        # Test environment uses MD5 hasher for speed
+        assert "$" in settings.deletion_password_hash  # Verify it's hashed
+
+    def test_set_deletion_password_without_validation(self, company_id, mock_user_data):
+        """Test setting deletion password without complexity validation."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            updated_by=mock_user_data["user_id"],
+        )
+
+        # Simple password (would fail validation)
+        settings.set_deletion_password("simple", validate_complexity=False)
+        assert settings.deletion_password_hash is not None
+
+    def test_set_deletion_password_validation_too_short(self, company_id, mock_user_data):
+        """Test password validation fails for passwords less than 8 characters."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            updated_by=mock_user_data["user_id"],
+        )
+
+        with pytest.raises(ValidationError, match="at least 8 characters"):
+            settings.set_deletion_password("Short1!", validate_complexity=True)
+
+    def test_set_deletion_password_validation_no_uppercase(self, company_id, mock_user_data):
+        """Test password validation fails without uppercase letter."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            updated_by=mock_user_data["user_id"],
+        )
+
+        with pytest.raises(ValidationError, match="at least one uppercase letter"):
+            settings.set_deletion_password("lowercase123!", validate_complexity=True)
+
+    def test_set_deletion_password_validation_no_number(self, company_id, mock_user_data):
+        """Test password validation fails without number."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            updated_by=mock_user_data["user_id"],
+        )
+
+        with pytest.raises(ValidationError, match="at least one number"):
+            settings.set_deletion_password("NoNumbers!", validate_complexity=True)
+
+    def test_set_deletion_password_validation_no_special(self, company_id, mock_user_data):
+        """Test password validation fails without special character."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            updated_by=mock_user_data["user_id"],
+        )
+
+        with pytest.raises(ValidationError, match="at least one special character"):
+            settings.set_deletion_password("NoSpecial123", validate_complexity=True)
+
+    def test_verify_deletion_password_success(self, company_id, mock_user_data):
+        """Test successful password verification."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            updated_by=mock_user_data["user_id"],
+        )
+
+        password = "ValidPass123!"
+        settings.set_deletion_password(password, validate_complexity=True)
+        settings.save()
+
+        assert settings.verify_deletion_password(password) is True
+
+    def test_verify_deletion_password_failure(self, company_id, mock_user_data):
+        """Test password verification fails with wrong password."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            updated_by=mock_user_data["user_id"],
+        )
+
+        settings.set_deletion_password("ValidPass123!", validate_complexity=True)
+        settings.save()
+
+        assert settings.verify_deletion_password("WrongPassword123!") is False
+
+    def test_verify_deletion_password_no_hash(self, company_id, mock_user_data):
+        """Test password verification returns False when no hash is set."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            updated_by=mock_user_data["user_id"],
+        )
+
+        assert settings.verify_deletion_password("AnyPassword123!") is False
+
+    def test_get_default_password(self, company_id, mock_user_data):
+        """Test getting default password (company name lowercase)."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            updated_by=mock_user_data["user_id"],
+        )
+
+        assert settings.get_default_password() == "test company"
+
+    def test_get_default_password_no_company_name(self, company_id, mock_user_data):
+        """Test default password when company name is not set."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="",
+            updated_by=mock_user_data["user_id"],
+        )
+
+        assert settings.get_default_password() == ""  # Returns empty string when no name
+
+    def test_record_failed_attempt(self, company_id, mock_user_data):
+        """Test recording failed deletion attempts."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            updated_by=mock_user_data["user_id"],
+        )
+
+        assert settings.failed_deletion_attempts == 0
+
+        settings.record_failed_attempt("user@example.com")
+        assert settings.failed_deletion_attempts == 1
+
+        settings.record_failed_attempt("user@example.com")
+        assert settings.failed_deletion_attempts == 2
+
+    def test_reset_failed_attempts(self, company_id, mock_user_data):
+        """Test resetting failed deletion attempts."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            failed_deletion_attempts=5,
+            updated_by=mock_user_data["user_id"],
+        )
+
+        settings.reset_failed_attempts()
+        assert settings.failed_deletion_attempts == 0
+
+    def test_default_values(self, company_id, mock_user_data):
+        """Test default values for organization settings."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            updated_by=mock_user_data["user_id"],
+        )
+
+        assert settings.deletion_protection_enabled is False
+        assert settings.deletion_password_hash is None
+        assert settings.failed_deletion_attempts == 0
