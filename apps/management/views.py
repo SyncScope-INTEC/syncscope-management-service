@@ -963,9 +963,7 @@ class OrganizationSettingsViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         user = request.user
 
         if not hasattr(user, "company_id") or not user.company_id:
-            return Response(
-                {"error": "User is not associated with a company."}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "User is not associated with a company."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get or create settings for the company
         settings, created = OrganizationSettings.objects.get_or_create(
@@ -1005,12 +1003,12 @@ class OrganizationSettingsViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
 
         user = request.user
         password = serializer.validated_data["password"]
-        user_identifier = serializer.validated_data.get("user_identifier", request.user.email if hasattr(request.user, "email") else "Unknown")
+        user_identifier = serializer.validated_data.get(
+            "user_identifier", request.user.email if hasattr(request.user, "email") else "Unknown"
+        )
 
         if not hasattr(user, "company_id") or not user.company_id:
-            return Response(
-                {"error": "User is not associated with a company."}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "User is not associated with a company."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get organization settings
         try:
@@ -1078,16 +1076,12 @@ class OrganizationSettingsViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         # Only admins or company admins can reset
         user = request.user
         if not (hasattr(user, "role") and user.role == "admin"):
-            return Response(
-                {"error": "You don't have permission to reset failed attempts."}, status=status.HTTP_403_FORBIDDEN
-            )
+            return Response({"error": "You don't have permission to reset failed attempts."}, status=status.HTTP_403_FORBIDDEN)
 
         settings.reset_failed_attempts()
         settings.save()
 
-        return Response(
-            {"message": "Failed attempts counter has been reset."}, status=status.HTTP_200_OK
-        )
+        return Response({"message": "Failed attempts counter has been reset."}, status=status.HTTP_200_OK)
 
     def _send_failed_attempt_alert(self, settings, user_identifier):
         """
@@ -1155,9 +1149,7 @@ class OrganizationSettingsViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
             if response.status_code in [200, 201]:
                 logger.info(f"Successfully sent failed deletion attempt alert for company {settings.company_id}")
             else:
-                logger.error(
-                    f"Failed to send alert to alerts service: {response.status_code} - {response.text}"
-                )
+                logger.error(f"Failed to send alert to alerts service: {response.status_code} - {response.text}")
 
         except Exception as e:
             logger.error(f"Error sending failed attempt alert: {e}", exc_info=True)

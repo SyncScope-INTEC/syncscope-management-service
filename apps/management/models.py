@@ -87,7 +87,9 @@ class OrganizationSettings(RetryableModelMixin, models.Model):
     # Failed Attempt Tracking
     failed_deletion_attempts = models.IntegerField(default=0, help_text="Count of failed deletion attempts")
     last_failed_attempt_at = models.DateTimeField(null=True, blank=True, help_text="Last failed deletion attempt")
-    last_failed_attempt_user = models.CharField(max_length=255, null=True, blank=True, help_text="Username/email of last failed attempt")
+    last_failed_attempt_user = models.CharField(
+        max_length=255, null=True, blank=True, help_text="Username/email of last failed attempt"
+    )
 
     # Metadata
     updated_by = models.UUIDField(help_text="User ID who last updated settings")
