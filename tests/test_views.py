@@ -1297,6 +1297,48 @@ class TestOrganizationSettingsViewSet:
         # Should return 404 or create settings and return False
         assert response.status_code in [status.HTTP_200_OK, status.HTTP_404_NOT_FOUND]
 
+    def test_update_company_name(self, authenticated_client, company_id, mock_user_data, mock_auth_service):
+        """Test updating company name in organization settings."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Old Company Name",
+            updated_by=mock_user_data["user_id"],
+        )
+
+        url = reverse("management:organizationsettings-detail", args=[settings.id])
+        data = {
+            "company_name": "New Company Name",
+        }
+
+        response = authenticated_client.patch(url, data, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        settings.refresh_from_db()
+        assert settings.company_name == "New Company Name"
+
+    def test_set_custom_deletion_password(self, authenticated_client, company_id, mock_user_data, mock_auth_service):
+        """Test setting a custom deletion password."""
+        settings = OrganizationSettings.objects.create(
+            company_id=company_id,
+            company_name="Test Company",
+            deletion_protection_enabled=True,
+            updated_by=mock_user_data["user_id"],
+        )
+
+        url = reverse("management:organizationsettings-detail", args=[settings.id])
+        data = {
+            "company_name": "Test Company",
+            "deletion_password": "MyCustomPass123!",
+        }
+
+        response = authenticated_client.put(url, data, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        settings.refresh_from_db()
+        # Verify custom password was set
+        assert settings.verify_deletion_password("MyCustomPass123!") is True
+        assert settings.verify_deletion_password("WrongPass") is False
+
     def test_reset_failed_attempts(self, admin_authenticated_client, company_id, mock_user_data, mock_auth_service):
         """Test resetting failed deletion attempts (admin only)."""
         settings = OrganizationSettings.objects.create(
