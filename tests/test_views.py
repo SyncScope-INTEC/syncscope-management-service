@@ -1261,7 +1261,9 @@ class TestOrganizationSettingsViewSet:
         settings.refresh_from_db()
         assert settings.deletion_protection_enabled is False
 
-    def test_verify_deletion_password_protection_disabled(self, authenticated_client, company_id, mock_user_data, mock_auth_service):
+    def test_verify_deletion_password_protection_disabled(
+        self, authenticated_client, company_id, mock_user_data, mock_auth_service
+    ):
         """Test password verification when protection is disabled."""
         settings = OrganizationSettings.objects.create(
             company_id=company_id,
