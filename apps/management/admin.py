@@ -228,24 +228,63 @@ class OrganizationSettingsAdmin(admin.ModelAdmin):
                 model = OrganizationSettings
                 fields = "__all__"
 
+            def clean_new_deletion_password(self):
+                """Validate the new deletion password if provided."""
+                new_password = self.cleaned_data.get("new_deletion_password")
+
+                if new_password:
+                    # Validate password complexity
+                    import re
+
+                    if len(new_password) < 8:
+                        raise forms.ValidationError("Password must be at least 8 characters long.")
+
+                    if not re.search(r"[A-Z]", new_password):
+                        raise forms.ValidationError("Password must contain at least one uppercase letter.")
+
+                    if not re.search(r"\d", new_password):
+                        raise forms.ValidationError("Password must contain at least one number.")
+
+                    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", new_password):
+                        raise forms.ValidationError("Password must contain at least one special character.")
+
+                return new_password
+
+            def clean(self):
+                """Validate the entire form."""
+                cleaned_data = super().clean()
+
+                # Ensure company_name is provided
+                company_name = cleaned_data.get("company_name")
+                if not company_name:
+                    raise forms.ValidationError({"company_name": "Company name is required."})
+
+                # Ensure updated_by is provided
+                if not cleaned_data.get("updated_by"):
+                    # Set it from request if available
+                    if hasattr(self, "_request"):
+                        cleaned_data["updated_by"] = self._request.user.id
+                    else:
+                        raise forms.ValidationError({"updated_by": "Updated by field is required."})
+
+                return cleaned_data
+
             def save(self, commit=True):
                 instance = super().save(commit=False)
 
-                # If a new password is provided, set it with validation
+                # If a new password is provided, set it (already validated in clean_new_deletion_password)
                 new_password = self.cleaned_data.get("new_deletion_password")
                 if new_password:
-                    try:
-                        instance.set_deletion_password(new_password, validate_complexity=True)
-                    except Exception as e:
-                        raise forms.ValidationError(f"Password error: {str(e)}")
+                    instance.set_deletion_password(new_password, validate_complexity=True)
 
                 if commit:
                     instance.save()
                 return instance
 
-        form = super().get_form(request, obj, **kwargs)
-        form.base_fields.update(OrganizationSettingsForm.base_fields)
-        return form
+        # Store request on form for access in clean method
+        form_class = type("OrganizationSettingsForm", (OrganizationSettingsForm,), {"_request": request})
+        kwargs["form"] = form_class
+        return super().get_form(request, obj, **kwargs)
 
     def save_model(self, request, obj, form, change):
         """Save the model and set updated_by to current user."""
