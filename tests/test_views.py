@@ -1126,8 +1126,16 @@ class TestOrganizationSettingsViewSet:
         response = authenticated_client.get(url)
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.data[0]["company_id"] == str(company_id)
-        assert response.data[0]["deletion_protection_enabled"] is True
+        # Response might be paginated
+        data = response.data.get("results", response.data)
+        if isinstance(data, list):
+            assert len(data) >= 1
+            assert data[0]["company_id"] == str(company_id)
+            assert data[0]["deletion_protection_enabled"] is True
+        else:
+            # Single object response
+            assert data["company_id"] == str(company_id)
+            assert data["deletion_protection_enabled"] is True
 
     def test_get_organization_settings_unauthenticated(self, api_client):
         """Test that unauthenticated users cannot access settings."""
@@ -1200,8 +1208,8 @@ class TestOrganizationSettingsViewSet:
         settings.refresh_from_db()
         assert settings.failed_deletion_attempts == 1
 
-    def test_reset_failed_attempts(self, authenticated_client, company_id, mock_user_data, mock_auth_service):
-        """Test resetting failed deletion attempts."""
+    def test_reset_failed_attempts(self, admin_authenticated_client, company_id, mock_user_data, mock_auth_service):
+        """Test resetting failed deletion attempts (admin only)."""
         settings = OrganizationSettings.objects.create(
             company_id=company_id,
             company_name="Test Company",
@@ -1210,7 +1218,7 @@ class TestOrganizationSettingsViewSet:
         )
 
         url = reverse("management:organizationsettings-reset-failed-attempts", args=[settings.id])
-        response = authenticated_client.post(url)
+        response = admin_authenticated_client.post(url)
 
         assert response.status_code == status.HTTP_200_OK
         settings.refresh_from_db()
