@@ -21,6 +21,7 @@ from .models import (
     CodeCommit,
     GitHubIntegration,
     Integration,
+    OrganizationSettings,
     Project,
     ProjectMember,
     Team,
@@ -33,6 +34,8 @@ from .serializers import (
     GitHubIntegrationSerializer,
     IntegrationCreateSerializer,
     IntegrationSerializer,
+    OrganizationSettingsSerializer,
+    OrganizationSettingsUpdateSerializer,
     ProjectCreateSerializer,
     ProjectDetailSerializer,
     ProjectMemberCreateSerializer,
@@ -44,6 +47,8 @@ from .serializers import (
     TeamMemberSerializer,
     TeamSerializer,
     TeamUpdateSerializer,
+    VerifyDeletionPasswordResponseSerializer,
+    VerifyDeletionPasswordSerializer,
 )
 
 
@@ -891,3 +896,268 @@ def get_git_events_team(request):
             {"error": f"Failed to get git events: {str(e)}", "events": [], "total_events": 0},
             status=500,
         )
+
+
+@extend_schema_view(
+    list=extend_schema(
+        tags=["Organization Settings"],
+        summary="Get organization settings",
+        description="Get organization settings for the authenticated user's company. "
+        "Creates settings record if it doesn't exist.",
+    ),
+    update=extend_schema(
+        tags=["Organization Settings"],
+        summary="Update organization settings",
+        description="Update organization settings including deletion protection and password.",
+        request=OrganizationSettingsUpdateSerializer,
+    ),
+    partial_update=extend_schema(
+        tags=["Organization Settings"],
+        summary="Partially update organization settings",
+        description="Partially update organization settings.",
+        request=OrganizationSettingsUpdateSerializer,
+    ),
+)
+class OrganizationSettingsViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
+    """
+    ViewSet for managing organization settings.
+
+    Provides endpoints for:
+    - GET /organization/settings/ - Get organization settings
+    - PUT/PATCH /organization/settings/{id}/ - Update settings
+    - POST /organization/settings/verify-deletion-password/ - Verify deletion password
+    - POST /organization/settings/reset-failed-attempts/ - Reset failed attempt counter
+    """
+
+    serializer_class = OrganizationSettingsSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ["get", "put", "patch", "post"]  # No create or delete
+
+    def get_queryset(self):
+        """Filter settings by user's company."""
+        user = self.request.user
+
+        # Admins can see all settings
+        if hasattr(user, "role") and user.role == "admin":
+            return OrganizationSettings.objects.all()
+
+        # Regular users see only their company's settings
+        if hasattr(user, "company_id") and user.company_id:
+            return OrganizationSettings.objects.filter(company_id=user.company_id)
+
+        return OrganizationSettings.objects.none()
+
+    def get_serializer_class(self):
+        """Return appropriate serializer based on action."""
+        if self.action in ["update", "partial_update"]:
+            return OrganizationSettingsUpdateSerializer
+        elif self.action == "verify_deletion_password":
+            return VerifyDeletionPasswordSerializer
+        return OrganizationSettingsSerializer
+
+    def list(self, request, *args, **kwargs):
+        """
+        Get organization settings, creating if doesn't exist.
+        Returns a single object, not a list.
+        """
+        user = request.user
+
+        if not hasattr(user, "company_id") or not user.company_id:
+            return Response(
+                {"error": "User is not associated with a company."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get or create settings for the company
+        settings, created = OrganizationSettings.objects.get_or_create(
+            company_id=user.company_id,
+            defaults={
+                "company_name": getattr(user, "company_name", f"Company {user.company_id}"),
+                "updated_by": user.id,
+            },
+        )
+
+        serializer = self.get_serializer(settings)
+        return Response(serializer.data)
+
+    @atomic_with_retry()
+    def perform_update(self, serializer):
+        """Update settings with user context."""
+        serializer.save(updated_by=self.request.user.id)
+
+    @extend_schema(
+        tags=["Organization Settings"],
+        summary="Verify deletion password",
+        description="Verify if the provided password matches the organization's deletion password. "
+        "Records failed attempts and can trigger alerts.",
+        request=VerifyDeletionPasswordSerializer,
+        responses={200: VerifyDeletionPasswordResponseSerializer},
+    )
+    @action(detail=False, methods=["post"])
+    def verify_deletion_password(self, request):
+        """
+        Verify deletion password.
+
+        This endpoint can be called by any authenticated user to verify the deletion password.
+        Failed attempts are recorded and alerts are sent to administrators.
+        """
+        serializer = VerifyDeletionPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        password = serializer.validated_data["password"]
+        user_identifier = serializer.validated_data.get("user_identifier", request.user.email if hasattr(request.user, "email") else "Unknown")
+
+        if not hasattr(user, "company_id") or not user.company_id:
+            return Response(
+                {"error": "User is not associated with a company."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get organization settings
+        try:
+            settings = OrganizationSettings.objects.get(company_id=user.company_id)
+        except OrganizationSettings.DoesNotExist:
+            return Response(
+                {
+                    "valid": False,
+                    "protection_enabled": False,
+                    "message": "No organization settings found. Deletion protection is not enabled.",
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # Check if protection is enabled
+        if not settings.deletion_protection_enabled:
+            return Response(
+                {"valid": True, "protection_enabled": False, "message": "Deletion protection is not enabled."},
+                status=status.HTTP_200_OK,
+            )
+
+        # Verify password
+        is_valid = settings.verify_deletion_password(password)
+
+        if is_valid:
+            # Reset failed attempts on successful verification
+            if settings.failed_deletion_attempts > 0:
+                settings.reset_failed_attempts()
+                settings.save()
+
+            return Response(
+                {"valid": True, "protection_enabled": True, "message": "Password verified successfully."},
+                status=status.HTTP_200_OK,
+            )
+        else:
+            # Record failed attempt
+            settings.record_failed_attempt(user_identifier)
+            settings.save()
+
+            # TODO: Trigger alert if failed attempts exceed threshold
+            # This will be implemented in the next task
+            if settings.failed_deletion_attempts >= 3:
+                # Send alert to administrators
+                self._send_failed_attempt_alert(settings, user_identifier)
+
+            return Response(
+                {
+                    "valid": False,
+                    "protection_enabled": True,
+                    "message": f"Invalid password. Failed attempts: {settings.failed_deletion_attempts}",
+                },
+                status=status.HTTP_200_OK,
+            )
+
+    @extend_schema(
+        tags=["Organization Settings"],
+        summary="Reset failed deletion attempts",
+        description="Reset the counter of failed deletion attempts. Requires admin permissions.",
+    )
+    @action(detail=True, methods=["post"])
+    def reset_failed_attempts(self, request, pk=None):
+        """Reset failed deletion attempts counter."""
+        settings = self.get_object()
+
+        # Only admins or company admins can reset
+        user = request.user
+        if not (hasattr(user, "role") and user.role == "admin"):
+            return Response(
+                {"error": "You don't have permission to reset failed attempts."}, status=status.HTTP_403_FORBIDDEN
+            )
+
+        settings.reset_failed_attempts()
+        settings.save()
+
+        return Response(
+            {"message": "Failed attempts counter has been reset."}, status=status.HTTP_200_OK
+        )
+
+    def _send_failed_attempt_alert(self, settings, user_identifier):
+        """
+        Send alert to administrators about failed deletion attempts.
+
+        Sends a security alert to the alerts service which will notify admins
+        via configured channels (email, Twilio, etc.).
+        """
+        import logging
+
+        import requests
+        from django.conf import settings as django_settings
+
+        logger = logging.getLogger(__name__)
+        logger.warning(
+            f"Failed deletion attempt for company {settings.company_id}. "
+            f"User: {user_identifier}. "
+            f"Total failed attempts: {settings.failed_deletion_attempts}"
+        )
+
+        try:
+            # Get alerts service URL from settings
+            alerts_service_url = getattr(django_settings, "ALERTS_SERVICE_URL", None)
+            if not alerts_service_url:
+                logger.error("ALERTS_SERVICE_URL not configured - cannot send alert")
+                return
+
+            # Prepare alert data
+            alert_data = {
+                "severity": "high" if settings.failed_deletion_attempts >= 5 else "medium",
+                "title": f"Failed Agent Deletion Attempt ({settings.failed_deletion_attempts} attempts)",
+                "message": (
+                    f"User {user_identifier} attempted to delete SyncScope agent with an incorrect password.\n\n"
+                    f"Company: {settings.company_name}\n"
+                    f"Total failed attempts: {settings.failed_deletion_attempts}\n"
+                    f"Last attempt: {settings.last_failed_attempt_at.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                    f"This may indicate an unauthorized deletion attempt. Please investigate."
+                ),
+                "metadata": {
+                    "type": "security",
+                    "event": "failed_deletion_attempt",
+                    "user": user_identifier,
+                    "company_id": str(settings.company_id),
+                    "company_name": settings.company_name,
+                    "failed_attempts": settings.failed_deletion_attempts,
+                    "timestamp": timezone.now().isoformat(),
+                },
+            }
+
+            # Send alert to alerts service
+            # Note: This sends directly to the alerts service which will handle
+            # routing to configured notification channels (email, Twilio, etc.)
+            url = f"{alerts_service_url}/alerts/"
+
+            # Use internal service authentication
+            from apps.auth.authentication import get_service_token
+
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {get_service_token()}",
+            }
+
+            response = requests.post(url, json=alert_data, headers=headers, timeout=10)
+
+            if response.status_code in [200, 201]:
+                logger.info(f"Successfully sent failed deletion attempt alert for company {settings.company_id}")
+            else:
+                logger.error(
+                    f"Failed to send alert to alerts service: {response.status_code} - {response.text}"
+                )
+
+        except Exception as e:
+            logger.error(f"Error sending failed attempt alert: {e}", exc_info=True)

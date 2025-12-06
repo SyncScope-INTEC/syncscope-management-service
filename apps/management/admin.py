@@ -9,6 +9,7 @@ from .models import (
     CodeCommit,
     GitHubIntegration,
     Integration,
+    OrganizationSettings,
     Project,
     ProjectMember,
     Team,
@@ -115,6 +116,141 @@ def safe_get_app_list(self, request):
 admin.ModelAdmin.log_action = safe_log_action
 admin.site.index = safe_index.__get__(admin.site, admin.AdminSite)
 admin.site.get_app_list = safe_get_app_list.__get__(admin.site, admin.AdminSite)
+
+
+@admin.register(OrganizationSettings)
+class OrganizationSettingsAdmin(admin.ModelAdmin):
+    """Admin interface for Organization Settings."""
+
+    list_display = (
+        "company_name",
+        "company_id",
+        "protection_status",
+        "failed_attempts_display",
+        "password_updated_display",
+        "updated_at",
+    )
+    list_filter = ("deletion_protection_enabled", "created_at", "updated_at")
+    search_fields = ("company_name", "company_id", "last_failed_attempt_user")
+    readonly_fields = (
+        "id",
+        "deletion_password_hash",
+        "deletion_password_updated_at",
+        "failed_deletion_attempts",
+        "last_failed_attempt_at",
+        "last_failed_attempt_user",
+        "created_at",
+        "updated_at",
+    )
+
+    fieldsets = (
+        (
+            "Organization Information",
+            {"fields": ("company_id", "company_name", "updated_by")},
+        ),
+        (
+            "Deletion Protection",
+            {
+                "fields": (
+                    "deletion_protection_enabled",
+                    "deletion_password_updated_at",
+                ),
+                "description": "Enable deletion protection to prevent unauthorized agent uninstallation. "
+                "If no custom password is set, the company name (lowercase) will be used as the default password.",
+            },
+        ),
+        (
+            "Security Information",
+            {
+                "fields": (
+                    "deletion_password_hash",
+                    "failed_deletion_attempts",
+                    "last_failed_attempt_at",
+                    "last_failed_attempt_user",
+                ),
+                "classes": ("collapse",),
+                "description": "View failed deletion attempts and security information. "
+                "Failed attempts trigger email alerts to organization administrators.",
+            },
+        ),
+        (
+            "Metadata",
+            {"fields": ("id", "created_at", "updated_at"), "classes": ("collapse",)},
+        ),
+    )
+
+    def protection_status(self, obj):
+        """Display deletion protection status with visual indicator."""
+        if obj.deletion_protection_enabled:
+            return format_html('<span style="color: #009900; font-weight: bold;">✓ Enabled</span>')
+        return format_html('<span style="color: #cc0000;">✗ Disabled</span>')
+
+    protection_status.short_description = "Protection Status"
+
+    def failed_attempts_display(self, obj):
+        """Display failed attempts count with warning color."""
+        count = obj.failed_deletion_attempts
+        if count > 0:
+            if count >= 10:
+                color = "#cc0000"  # Red for many failures
+            elif count >= 5:
+                color = "#ff9900"  # Orange for moderate failures
+            else:
+                color = "#666666"  # Gray for few failures
+            return format_html('<span style="color: {}; font-weight: bold;">{}</span>', color, count)
+        return format_html('<span style="color: #009900;">0</span>')
+
+    failed_attempts_display.short_description = "Failed Attempts"
+
+    def password_updated_display(self, obj):
+        """Display when password was last updated."""
+        if obj.deletion_password_updated_at:
+            return obj.deletion_password_updated_at.strftime("%Y-%m-%d %H:%M")
+        return format_html('<span style="color: #999999;">Never</span>')
+
+    password_updated_display.short_description = "Password Updated"
+
+    def get_form(self, request, obj=None, **kwargs):
+        """Customize the admin form."""
+        from django import forms
+
+        class OrganizationSettingsForm(forms.ModelForm):
+            # Add a custom password field for setting new passwords
+            new_deletion_password = forms.CharField(
+                required=False,
+                widget=forms.PasswordInput,
+                help_text="Enter a new deletion password (min 8 chars, 1 uppercase, 1 number, 1 special character). "
+                "Leave blank to keep current password or use default (company name lowercase).",
+                label="New Deletion Password",
+            )
+
+            class Meta:
+                model = OrganizationSettings
+                fields = "__all__"
+
+            def save(self, commit=True):
+                instance = super().save(commit=False)
+
+                # If a new password is provided, set it with validation
+                new_password = self.cleaned_data.get("new_deletion_password")
+                if new_password:
+                    try:
+                        instance.set_deletion_password(new_password, validate_complexity=True)
+                    except Exception as e:
+                        raise forms.ValidationError(f"Password error: {str(e)}")
+
+                if commit:
+                    instance.save()
+                return instance
+
+        form = super().get_form(request, obj, **kwargs)
+        form.base_fields.update(OrganizationSettingsForm.base_fields)
+        return form
+
+    def save_model(self, request, obj, form, change):
+        """Save the model and set updated_by to current user."""
+        obj.updated_by = request.user.id
+        super().save_model(request, obj, form, change)
 
 
 class TeamMemberInline(admin.TabularInline):

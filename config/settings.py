@@ -245,6 +245,7 @@ CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="http://localhost:
 AUTH_SERVICE_URL = config("AUTH_SERVICE_URL", default="http://localhost:8000")
 MONITORING_SERVICE_URL = config("MONITORING_SERVICE_URL", default="http://localhost:8001")
 ANALYTICS_SERVICE_URL = config("ANALYTICS_SERVICE_URL", default="http://localhost:8003")
+ALERTS_SERVICE_URL = config("ALERTS_SERVICE_URL", default="http://localhost:8004")
 
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True

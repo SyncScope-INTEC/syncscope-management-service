@@ -7,6 +7,7 @@ from .models import (
     CodeCommit,
     GitHubIntegration,
     Integration,
+    OrganizationSettings,
     Project,
     ProjectMember,
     Team,
@@ -510,6 +511,113 @@ class IntegrationCreateSerializer(serializers.Serializer):
                     raise serializers.ValidationError(f"Slack integration requires '{field}' in config_data.")
 
         return value
+
+
+class OrganizationSettingsSerializer(serializers.ModelSerializer):
+    """Serializer for Organization Settings."""
+
+    class Meta:
+        model = OrganizationSettings
+        fields = [
+            "id",
+            "company_id",
+            "company_name",
+            "deletion_protection_enabled",
+            "deletion_password_updated_at",
+            "failed_deletion_attempts",
+            "last_failed_attempt_at",
+            "last_failed_attempt_user",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "deletion_password_updated_at",
+            "failed_deletion_attempts",
+            "last_failed_attempt_at",
+            "last_failed_attempt_user",
+            "created_at",
+            "updated_at",
+        ]
+
+    # Exclude the password hash from serialization for security
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Never expose the password hash
+        data.pop("deletion_password_hash", None)
+        return data
+
+
+class OrganizationSettingsUpdateSerializer(serializers.Serializer):
+    """Serializer for updating organization settings."""
+
+    deletion_protection_enabled = serializers.BooleanField(required=False, help_text="Enable/disable deletion protection")
+    new_deletion_password = serializers.CharField(
+        required=False,
+        write_only=True,
+        min_length=8,
+        help_text="New deletion password (min 8 chars, 1 uppercase, 1 number, 1 special character)",
+    )
+
+    def validate(self, attrs):
+        """Validate the update data."""
+        new_password = attrs.get("new_deletion_password")
+
+        # If a password is provided, validate it
+        if new_password:
+            import re
+
+            # Check password complexity
+            if len(new_password) < 8:
+                raise serializers.ValidationError({"new_deletion_password": "Password must be at least 8 characters long."})
+
+            if not re.search(r"[A-Z]", new_password):
+                raise serializers.ValidationError(
+                    {"new_deletion_password": "Password must contain at least one uppercase letter."}
+                )
+
+            if not re.search(r"\d", new_password):
+                raise serializers.ValidationError({"new_deletion_password": "Password must contain at least one number."})
+
+            if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", new_password):
+                raise serializers.ValidationError(
+                    {"new_deletion_password": "Password must contain at least one special character."}
+                )
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        """Update organization settings."""
+        new_password = validated_data.pop("new_deletion_password", None)
+
+        # Update regular fields
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+
+        # Update password if provided
+        if new_password:
+            instance.set_deletion_password(new_password, validate_complexity=True)
+
+        instance.save()
+        return instance
+
+
+class VerifyDeletionPasswordSerializer(serializers.Serializer):
+    """Serializer for deletion password verification."""
+
+    password = serializers.CharField(required=True, write_only=True, help_text="Deletion password to verify")
+    user_identifier = serializers.CharField(
+        required=False, write_only=True, help_text="Username or email of user attempting deletion (for tracking)"
+    )
+
+
+class VerifyDeletionPasswordResponseSerializer(serializers.Serializer):
+    """Response serializer for password verification."""
+
+    valid = serializers.BooleanField(help_text="Whether the password is valid")
+    protection_enabled = serializers.BooleanField(help_text="Whether deletion protection is enabled")
+    message = serializers.CharField(required=False, help_text="Additional message or info")
 
 
 class ErrorResponseSerializer(serializers.Serializer):

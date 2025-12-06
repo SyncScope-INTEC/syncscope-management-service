@@ -9,6 +9,7 @@ from .views import (
     CodeCommitViewSet,
     GitHubIntegrationViewSet,
     IntegrationViewSet,
+    OrganizationSettingsViewSet,
     ProjectMemberViewSet,
     ProjectViewSet,
     TeamMemberViewSet,
@@ -20,6 +21,7 @@ from .views import (
 
 # Create router and register viewsets
 router = DefaultRouter()
+router.register(r"organization/settings", OrganizationSettingsViewSet, basename="organizationsettings")
 router.register(r"teams", TeamViewSet, basename="team")
 router.register(r"projects", ProjectViewSet, basename="project")
 router.register(r"team-members", TeamMemberViewSet, basename="teammember")

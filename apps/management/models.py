@@ -1,7 +1,10 @@
+import re
 import sys
 import uuid
 
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import AbstractBaseUser
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
@@ -63,6 +66,135 @@ def get_table_name(base_name):
     else:
         # PostgreSQL with management schema
         return f"management.{base_name}"
+
+
+class OrganizationSettings(RetryableModelMixin, models.Model):
+    """
+    Model representing organization-level settings and policies.
+    Maps to the management.organization_settings table.
+    Each organization (company) has one settings record.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company_id = models.UUIDField(unique=True, db_index=True, help_text="Reference to auth.companies.id")
+    company_name = models.CharField(max_length=255, help_text="Company name for default password generation")
+
+    # Deletion Protection Settings
+    deletion_protection_enabled = models.BooleanField(default=False, help_text="Enable deletion protection for agents")
+    deletion_password_hash = models.CharField(max_length=255, blank=True, null=True, help_text="Hashed deletion password")
+    deletion_password_updated_at = models.DateTimeField(null=True, blank=True, help_text="When password was last updated")
+
+    # Failed Attempt Tracking
+    failed_deletion_attempts = models.IntegerField(default=0, help_text="Count of failed deletion attempts")
+    last_failed_attempt_at = models.DateTimeField(null=True, blank=True, help_text="Last failed deletion attempt")
+    last_failed_attempt_user = models.CharField(max_length=255, null=True, blank=True, help_text="Username/email of last failed attempt")
+
+    # Metadata
+    updated_by = models.UUIDField(help_text="User ID who last updated settings")
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = RetryableManager()
+
+    class Meta:
+        db_table = get_table_name("organization_settings")
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["company_id"]),
+            models.Index(fields=["deletion_protection_enabled"]),
+        ]
+        verbose_name = "Organization Settings"
+        verbose_name_plural = "Organization Settings"
+
+    def __str__(self):
+        return f"Settings for {self.company_name}"
+
+    def _validate_password_complexity(self, password: str) -> None:
+        """
+        Validate password meets complexity requirements.
+        - Minimum 8 characters
+        - At least 1 uppercase letter
+        - At least 1 number
+        - At least 1 special character
+
+        Note: This is NOT enforced for default passwords (company name lowercase)
+        """
+        if len(password) < 8:
+            raise ValidationError("Password must be at least 8 characters long.")
+
+        if not re.search(r"[A-Z]", password):
+            raise ValidationError("Password must contain at least one uppercase letter.")
+
+        if not re.search(r"\d", password):
+            raise ValidationError("Password must contain at least one number.")
+
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+            raise ValidationError("Password must contain at least one special character.")
+
+    def set_deletion_password(self, password: str, validate_complexity: bool = True) -> None:
+        """
+        Hash and set deletion password.
+
+        Args:
+            password: Plain text password to set
+            validate_complexity: If True, enforce password complexity rules.
+                                Set to False for default passwords (company name).
+        """
+        if validate_complexity:
+            self._validate_password_complexity(password)
+
+        self.deletion_password_hash = make_password(password)
+        self.deletion_password_updated_at = timezone.now()
+
+    def verify_deletion_password(self, password: str) -> bool:
+        """
+        Verify deletion password against stored hash.
+
+        Args:
+            password: Plain text password to verify
+
+        Returns:
+            True if password matches, False otherwise
+        """
+        if not self.deletion_password_hash:
+            return False
+        return check_password(password, self.deletion_password_hash)
+
+    def get_default_password(self) -> str:
+        """
+        Get default password based on company name (lowercase).
+
+        Returns:
+            Company name in lowercase
+        """
+        return self.company_name.lower() if self.company_name else ""
+
+    def record_failed_attempt(self, user_identifier: str) -> None:
+        """
+        Record a failed deletion attempt.
+
+        Args:
+            user_identifier: Username or email of user who made the attempt
+        """
+        self.failed_deletion_attempts += 1
+        self.last_failed_attempt_at = timezone.now()
+        self.last_failed_attempt_user = user_identifier
+
+    def reset_failed_attempts(self) -> None:
+        """Reset failed deletion attempt counter."""
+        self.failed_deletion_attempts = 0
+        self.last_failed_attempt_at = None
+        self.last_failed_attempt_user = None
+
+    @atomic_with_retry()
+    def save(self, *args, **kwargs):
+        # If deletion protection is enabled but no password is set, use default
+        if self.deletion_protection_enabled and not self.deletion_password_hash:
+            default_password = self.get_default_password()
+            if default_password:
+                self.set_deletion_password(default_password, validate_complexity=False)
+
+        super().save(*args, **kwargs)
 
 
 class Team(RetryableModelMixin, models.Model):
