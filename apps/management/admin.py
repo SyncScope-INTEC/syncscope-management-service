@@ -224,6 +224,7 @@ class OrganizationSettingsAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "deletion_protection_enabled",
+                    "new_deletion_password",
                     "deletion_password_updated_at",
                 ),
                 "description": "Enable deletion protection to prevent unauthorized agent uninstallation. "
