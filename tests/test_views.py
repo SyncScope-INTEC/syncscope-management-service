@@ -1263,27 +1263,29 @@ class TestOrganizationSettingsViewSet:
         settings.refresh_from_db()
         assert settings.deletion_protection_enabled is False
 
-    def test_verify_deletion_password_protection_disabled(
+    def test_verify_deletion_password_with_wrong_password(
         self, authenticated_client, company_id, mock_user_data, mock_auth_service
     ):
-        """Test password verification when protection is disabled."""
+        """Test password verification with an incorrect password."""
         settings = OrganizationSettings.objects.create(
             company_id=company_id,
             company_name="Test Company",
-            deletion_protection_enabled=False,
+            deletion_protection_enabled=True,
             updated_by=mock_user_data["user_id"],
         )
+        settings.set_deletion_password("CorrectPass123!", validate_complexity=True)
+        settings.save()
 
         url = reverse("management:organizationsettings-verify-deletion-password")
-        # Test with empty password since protection is disabled
-        data = {"password": ""}
+        data = {"password": "WrongPassword456!"}
 
         response = authenticated_client.post(url, data, format="json")
 
-        # When protection is disabled and default password is set, empty password should return True
         assert response.status_code == status.HTTP_200_OK
-        # The default password is empty string when protection is disabled
-        assert response.data["valid"] is True
+        assert response.data["valid"] is False
+        # Verify failed attempt was incremented
+        settings.refresh_from_db()
+        assert settings.failed_deletion_attempts == 1
 
     def test_verify_deletion_password_no_settings(self, authenticated_client, mock_auth_service):
         """Test password verification when no settings exist."""
