@@ -13,7 +13,12 @@ from drf_spectacular.views import (
 )
 
 from apps.management.health import health_check, liveness_check, readiness_check, simple_health_check
-from apps.management.views import api_get_team_members, api_home, favicon_view
+from apps.management.views import OrganizationSettingsViewSet, api_get_team_members, api_home, favicon_view
+from rest_framework.routers import DefaultRouter
+
+# Create router for organization settings (agent API)
+agent_router = DefaultRouter()
+agent_router.register(r"organization/settings", OrganizationSettingsViewSet, basename="agent_organizationsettings")
 
 urlpatterns = [
     # Home page
@@ -26,6 +31,8 @@ urlpatterns = [
     path("health/detailed/", health_check, name="detailed_health_check"),
     path("health/ready/", readiness_check, name="readiness_check"),
     path("health/live/", liveness_check, name="liveness_check"),
+    # Agent API endpoints (direct access without /management/ prefix)
+    path("", include(agent_router.urls)),
     # Management endpoints
     path("management/", include("apps.management.urls")),
     # API endpoints for analytics service integration
