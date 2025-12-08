@@ -11,10 +11,10 @@ from drf_spectacular.views import (
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
+from rest_framework.routers import DefaultRouter
 
 from apps.management.health import health_check, liveness_check, readiness_check, simple_health_check
 from apps.management.views import OrganizationSettingsViewSet, api_get_team_members, api_home, favicon_view
-from rest_framework.routers import DefaultRouter
 
 # Create router for organization settings (agent API)
 agent_router = DefaultRouter()
