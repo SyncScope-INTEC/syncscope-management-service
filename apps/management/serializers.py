@@ -523,6 +523,7 @@ class OrganizationSettingsSerializer(serializers.ModelSerializer):
             "company_id",
             "company_name",
             "deletion_protection_enabled",
+            "deletion_password_hash",  # Include for authenticated users (agent needs this for offline mode)
             "deletion_password_updated_at",
             "failed_deletion_attempts",
             "last_failed_attempt_at",
@@ -533,6 +534,7 @@ class OrganizationSettingsSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "deletion_password_hash",  # Read-only, set via set_deletion_password() method
             "deletion_password_updated_at",
             "failed_deletion_attempts",
             "last_failed_attempt_at",
@@ -541,11 +543,21 @@ class OrganizationSettingsSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
-    # Exclude the password hash from serialization for security
     def to_representation(self, instance):
+        """
+        Customize representation to conditionally include password hash.
+
+        The password hash is only included for authenticated users so that
+        the agent can cache it locally for offline deletion protection verification.
+        """
         data = super().to_representation(instance)
-        # Never expose the password hash
-        data.pop("deletion_password_hash", None)
+
+        # Only include password hash for authenticated requests
+        # For unauthenticated or non-existent requests, remove the hash
+        request = self.context.get("request")
+        if not request or not request.user or not request.user.is_authenticated:
+            data.pop("deletion_password_hash", None)
+
         return data
 
 
