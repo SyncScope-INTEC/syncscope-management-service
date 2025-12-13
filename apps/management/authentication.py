@@ -124,10 +124,10 @@ class AuthServiceIntegration:
     @staticmethod
     def get_user_by_id(user_id, token=None):
         """
-        Fetch user details from the auth service.
+        Fetch user details from the auth service by user ID.
         """
         auth_service_url = getattr(settings, "AUTH_SERVICE_URL", "http://localhost:8000")
-        user_url = f"{auth_service_url}/auth/profile/"
+        user_url = f"{auth_service_url}/auth/users/{user_id}/"
 
         headers = {"Content-Type": "application/json"}
         if token:
