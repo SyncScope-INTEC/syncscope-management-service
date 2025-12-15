@@ -415,7 +415,7 @@ jobs:
           python manage.py spectacular --file schema.yml --settings=config.test_settings
 
       - name: Upload schema artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: management-service-openapi-schema
           path: schema.yml
