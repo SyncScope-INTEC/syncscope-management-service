@@ -8,7 +8,7 @@ from django.template import loader
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -122,7 +122,16 @@ def api_home(request):
     list=extend_schema(
         tags=["Teams"],
         summary="List teams",
-        description="Get a list of teams for the authenticated user's company.",
+        description="Get a list of teams for the authenticated user's company. Supports filtering by project.",
+        parameters=[
+            OpenApiParameter(
+                name="project",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter teams by project ID (UUID)",
+                required=False,
+            ),
+        ],
     ),
     create=extend_schema(
         tags=["Teams"],
@@ -272,7 +281,23 @@ class TeamViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
     list=extend_schema(
         tags=["Projects"],
         summary="List projects",
-        description="Get a list of projects the user has access to.",
+        description="Get a list of projects the user has access to. Supports filtering by company and user.",
+        parameters=[
+            OpenApiParameter(
+                name="company",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter projects by company ID (UUID)",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="user",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter projects by user ID (UUID) - shows projects where user is a member",
+                required=False,
+            ),
+        ],
     ),
     create=extend_schema(
         tags=["Projects"],
