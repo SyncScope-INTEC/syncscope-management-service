@@ -6,15 +6,7 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 
-from apps.management.models import (
-    CodeCommit,
-    GitHubIntegration,
-    Integration,
-    OrganizationSettings,
-    Project,
-    Team,
-    TeamMember,
-)
+from apps.management.models import CodeCommit, GitHubIntegration, Integration, OrganizationSettings, Project, Team, TeamMember
 
 
 @pytest.mark.django_db
@@ -122,6 +114,27 @@ class TestTeamViewSet:
 
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) >= 1
+
+    def test_filter_teams_by_project(self, authenticated_client, team_with_lead, project, mock_auth_service):
+        """Test filtering teams by project ID."""
+        team, lead = team_with_lead
+        # Update project to belong to this team
+        project.team = team
+        project.save()
+
+        # Create another team without this project
+        other_team = Team.objects.create(name="Other Team", company_id=team.company_id, created_by=team.created_by)
+
+        url = reverse("management:team-list")
+        response = authenticated_client.get(url, {"project": str(project.id)})
+
+        assert response.status_code == status.HTTP_200_OK
+        results = response.data.get("results", response.data)
+        # Should only return the team that has this project
+        assert len(results) >= 1
+        assert any(str(t["id"]) == str(team.id) for t in results)
+        # Should not include the other team
+        assert not any(str(t["id"]) == str(other_team.id) for t in results)
 
 
 @pytest.mark.django_db
@@ -234,6 +247,100 @@ class TestProjectViewSet:
 
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) >= 1
+
+    def test_filter_projects_by_company(self, authenticated_client, team_with_lead, mock_auth_service, mock_user_data):
+        """Test filtering projects by company ID."""
+        from apps.management.models import ProjectMember
+
+        team, lead = team_with_lead
+
+        # Create a project in this team's company
+        project1 = Project.objects.create(name="Company Project", team=team)
+
+        # Make authenticated user a member of this project
+        TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
+        ProjectMember.objects.create(project=project1, user_id=mock_user_data["user_id"], role="contributor")
+
+        # Create another team in a different company
+        other_company_id = uuid.uuid4()
+        other_team = Team.objects.create(name="Other Company Team", company_id=other_company_id, created_by=team.created_by)
+        project2 = Project.objects.create(name="Other Company Project", team=other_team)
+
+        url = reverse("management:project-list")
+        response = authenticated_client.get(url, {"company": str(team.company_id)})
+
+        assert response.status_code == status.HTTP_200_OK
+        results = response.data.get("results", response.data)
+        # Should only return projects from the specified company
+        if isinstance(results, list):
+            project_ids = [str(p["id"]) for p in results]
+            assert str(project1.id) in project_ids
+            # Should not include projects from other companies
+            assert str(project2.id) not in project_ids
+
+    def test_filter_projects_by_user(self, authenticated_client, team_with_lead, mock_auth_service, mock_user_data):
+        """Test filtering projects by user ID."""
+        from apps.management.models import ProjectMember
+
+        team, lead = team_with_lead
+
+        # Create two projects
+        project1 = Project.objects.create(name="User Project", team=team)
+        project2 = Project.objects.create(name="Other Project", team=team)
+
+        # Make authenticated user a team member
+        TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
+
+        # Add user to only project1
+        ProjectMember.objects.create(project=project1, user_id=mock_user_data["user_id"], role="contributor")
+
+        # Add different user to project2 (must be team member first)
+        other_user_id = uuid.uuid4()
+        TeamMember.objects.create(team=team, user_id=other_user_id, role="developer")
+        ProjectMember.objects.create(project=project2, user_id=other_user_id, role="contributor")
+
+        url = reverse("management:project-list")
+        response = authenticated_client.get(url, {"user": str(mock_user_data["user_id"])})
+
+        assert response.status_code == status.HTTP_200_OK
+        results = response.data.get("results", response.data)
+        # Should only return projects where the user is a member
+        if isinstance(results, list):
+            project_ids = [str(p["id"]) for p in results]
+            assert str(project1.id) in project_ids
+
+    def test_filter_projects_by_company_and_user(
+        self, authenticated_client, team_with_lead, mock_auth_service, mock_user_data
+    ):
+        """Test filtering projects by both company and user ID."""
+        from apps.management.models import ProjectMember
+
+        team, lead = team_with_lead
+
+        # Create project in this company with user as member
+        project1 = Project.objects.create(name="Company User Project", team=team)
+
+        # Make authenticated user a team member
+        TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
+        ProjectMember.objects.create(project=project1, user_id=mock_user_data["user_id"], role="contributor")
+
+        # Create another project in same company with different user (must be team member first)
+        project2 = Project.objects.create(name="Company Other Project", team=team)
+        other_user_id = uuid.uuid4()
+        TeamMember.objects.create(team=team, user_id=other_user_id, role="developer")
+        ProjectMember.objects.create(project=project2, user_id=other_user_id, role="contributor")
+
+        url = reverse("management:project-list")
+        response = authenticated_client.get(url, {"company": str(team.company_id), "user": str(mock_user_data["user_id"])})
+
+        assert response.status_code == status.HTTP_200_OK
+        results = response.data.get("results", response.data)
+        # Should only return projects matching both filters
+        if isinstance(results, list):
+            project_ids = [str(p["id"]) for p in results]
+            assert str(project1.id) in project_ids
+            # Should not include project2 (different user)
+            assert str(project2.id) not in project_ids
 
 
 @pytest.mark.django_db

@@ -17,16 +17,7 @@ from config.database_retry import atomic_with_retry
 
 from .authentication import AuthServiceIntegration
 from .db_mixins import ServerlessViewMixin
-from .models import (
-    CodeCommit,
-    GitHubIntegration,
-    Integration,
-    OrganizationSettings,
-    Project,
-    ProjectMember,
-    Team,
-    TeamMember,
-)
+from .models import CodeCommit, GitHubIntegration, Integration, OrganizationSettings, Project, ProjectMember, Team, TeamMember
 from .permissions import IsOwnerOrAdmin, IsProjectMemberOrAdmin, IsTeamMemberOrAdmin
 from .serializers import (
     CodeCommitSerializer,
@@ -172,12 +163,19 @@ class TeamViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         """Filter teams by user's company."""
         user = self.request.user
         if hasattr(user, "role") and user.role == "admin":
-            return Team.objects.all()
+            queryset = Team.objects.all()
+        elif hasattr(user, "company_id") and user.company_id:
+            queryset = Team.objects.filter(company_id=user.company_id)
+        else:
+            queryset = Team.objects.none()
 
-        if hasattr(user, "company_id") and user.company_id:
-            return Team.objects.filter(company_id=user.company_id)
+        # Apply query parameter filters
+        # Filter by project
+        project_id = self.request.query_params.get("project")
+        if project_id:
+            queryset = queryset.filter(projects__id=project_id).distinct()
 
-        return Team.objects.none()
+        return queryset
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action."""
@@ -314,14 +312,26 @@ class ProjectViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         user = self.request.user
 
         if hasattr(user, "role") and user.role == "admin":
-            return Project.objects.all()
-
-        if hasattr(user, "id"):
+            queryset = Project.objects.all()
+        elif hasattr(user, "id"):
             # Get projects from teams user is a member of
             user_teams = TeamMember.objects.filter(user_id=user.id).values_list("team", flat=True)
-            return Project.objects.filter(team__in=user_teams)
+            queryset = Project.objects.filter(team__in=user_teams)
+        else:
+            return Project.objects.none()
 
-        return Project.objects.none()
+        # Apply query parameter filters
+        # Filter by company (via team.company_id)
+        company_id = self.request.query_params.get("company")
+        if company_id:
+            queryset = queryset.filter(team__company_id=company_id)
+
+        # Filter by user (projects where user is a member)
+        user_id = self.request.query_params.get("user")
+        if user_id:
+            queryset = queryset.filter(members__user_id=user_id).distinct()
+
+        return queryset
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action."""
