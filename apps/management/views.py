@@ -509,7 +509,16 @@ class ProjectViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
     list=extend_schema(
         tags=["Team Members"],
         summary="List team members",
-        description="Get a list of all team members the user has access to.",
+        description="Get a list of all team members the user has access to. Supports filtering by project.",
+        parameters=[
+            OpenApiParameter(
+                name="project",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter team members by project ID (UUID) - shows members of teams that have this project",
+                required=False,
+            ),
+        ],
     ),
     create=extend_schema(
         tags=["Team Members"],
@@ -549,14 +558,21 @@ class TeamMemberViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         user = self.request.user
 
         if hasattr(user, "role") and user.role == "admin":
-            return TeamMember.objects.all()
-
-        if hasattr(user, "id"):
+            queryset = TeamMember.objects.all()
+        elif hasattr(user, "id"):
             # Get members from teams user is a member of
             user_teams = TeamMember.objects.filter(user_id=user.id).values_list("team", flat=True)
-            return TeamMember.objects.filter(team__in=user_teams)
+            queryset = TeamMember.objects.filter(team__in=user_teams)
+        else:
+            queryset = TeamMember.objects.none()
 
-        return TeamMember.objects.none()
+        # Apply query parameter filters
+        # Filter by project (team members whose team has this project)
+        project_id = self.request.query_params.get("project")
+        if project_id:
+            queryset = queryset.filter(team__projects__id=project_id).distinct()
+
+        return queryset
 
 
 @extend_schema_view(

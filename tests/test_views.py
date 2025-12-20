@@ -397,6 +397,37 @@ class TestTeamMemberViewSet:
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not TeamMember.objects.filter(id=team_member.id).exists()
 
+    def test_filter_team_members_by_project(self, authenticated_client, team_with_lead, mock_auth_service, mock_user_data):
+        """Test filtering team members by project ID."""
+        team, lead = team_with_lead
+
+        # Create a project for this team
+        project = Project.objects.create(name="Test Project", team=team)
+
+        # Create another team without this project
+        other_team = Team.objects.create(name="Other Team", company_id=team.company_id, created_by=team.created_by)
+        other_member = TeamMember.objects.create(team=other_team, user_id=uuid.uuid4(), role="developer")
+
+        # Make authenticated user a member of both teams
+        TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
+        TeamMember.objects.get_or_create(
+            team=other_team,
+            user_id=mock_user_data["user_id"],
+            defaults={"role": "developer"},
+        )
+
+        url = reverse("management:teammember-list")
+        response = authenticated_client.get(url, {"project": str(project.id)})
+
+        assert response.status_code == status.HTTP_200_OK
+        results = response.data.get("results", response.data)
+        # Should only return members from the team that has this project
+        if isinstance(results, list):
+            member_ids = [m["id"] for m in results]
+            assert str(lead.id) in member_ids
+            # Should not include members from other teams
+            assert str(other_member.id) not in member_ids
+
 
 @pytest.mark.django_db
 class TestIntegrationViewSet:
