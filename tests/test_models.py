@@ -689,7 +689,7 @@ class TestProjectInvitationModel:
         )
 
         assert invitation.project == project
-        assert invitation.inviter_id == uuid.UUID(mock_user_data["user_id"])
+        assert str(invitation.inviter_id) == mock_user_data["user_id"]
         assert invitation.invitee_email == "invitee@example.com"
         assert invitation.role == "developer"
         assert invitation.token is not None  # Auto-generated
