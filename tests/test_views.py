@@ -6,7 +6,17 @@ import pytest
 from django.urls import reverse
 from rest_framework import status
 
-from apps.management.models import CodeCommit, GitHubIntegration, Integration, OrganizationSettings, Project, Team, TeamMember
+from apps.management.models import (
+    CodeCommit,
+    GitHubIntegration,
+    Integration,
+    OrganizationSettings,
+    Project,
+    ProjectInvitation,
+    ProjectMember,
+    Team,
+    TeamMember,
+)
 
 
 @pytest.mark.django_db
@@ -1495,3 +1505,153 @@ class TestOrganizationSettingsViewSet:
         assert response.status_code == status.HTTP_200_OK
         settings.refresh_from_db()
         assert settings.failed_deletion_attempts == 0
+
+
+@pytest.mark.django_db
+class TestProjectInvitationView:
+    """Tests for project invitation creation and listing endpoints."""
+
+    def test_create_invitation_as_admin(self, admin_authenticated_client, project, mock_admin_user_data, mock_auth_service):
+        """Test admin can create project invitations."""
+        url = reverse("management:project_invitations")
+        data = {
+            "project_id": str(project.id),
+            "invitee_email": "newuser@example.com",
+            "role": "developer",
+        }
+
+        with patch("apps.management.views.send_project_invitation_email") as mock_email:
+            mock_email.return_value = True
+            response = admin_authenticated_client.post(url, data, format="json")
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert "invitation_id" in response.data
+        assert response.data["invitee_email"] == "newuser@example.com"
+        assert ProjectInvitation.objects.filter(invitee_email="newuser@example.com").exists()
+
+    def test_create_invitation_as_supervisor(self, authenticated_client, project, base_user_data, mock_auth_service):
+        """Test supervisor can create project invitations."""
+        # Mock user as supervisor
+        mock_post, mock_get = mock_auth_service
+        supervisor_data = base_user_data.copy()
+        supervisor_data["role"] = "supervisor"
+        mock_post.return_value.json.return_value = {"valid": True, **supervisor_data}
+
+        url = reverse("management:project_invitations")
+        data = {
+            "project_id": str(project.id),
+            "invitee_email": "newuser@example.com",
+            "role": "supervisor",
+        }
+
+        with patch("apps.management.views.send_project_invitation_email") as mock_email:
+            mock_email.return_value = True
+            response = authenticated_client.post(url, data, format="json")
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert ProjectInvitation.objects.filter(invitee_email="newuser@example.com", role="supervisor").exists()
+
+    def test_create_invitation_as_developer_forbidden(self, authenticated_client, project, mock_auth_service):
+        """Test developer cannot create project invitations."""
+        url = reverse("management:project_invitations")
+        data = {
+            "project_id": str(project.id),
+            "invitee_email": "newuser@example.com",
+            "role": "developer",
+        }
+
+        response = authenticated_client.post(url, data, format="json")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_list_invitations_admin(self, admin_authenticated_client, project, mock_admin_user_data, mock_auth_service):
+        """Test admin can list all invitations."""
+        # Create test invitations
+        ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=mock_admin_user_data["user_id"],
+            invitee_email="user1@example.com",
+            role="developer",
+        )
+
+        url = reverse("management:project_invitations")
+        response = admin_authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data) >= 1
+
+    def test_list_invitations_unauthenticated(self, api_client):
+        """Test unauthenticated users cannot list invitations."""
+        url = reverse("management:project_invitations")
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.django_db
+class TestAcceptProjectInvitationView:
+    """Tests for project invitation acceptance endpoints."""
+
+    def test_accept_invitation_success(self, authenticated_client, project, team, mock_user_data, mock_auth_service):
+        """Test successful invitation acceptance."""
+        # Create invitation
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=uuid.uuid4(),
+            invitee_email="invitee@example.com",
+            role="developer",
+        )
+
+        url = reverse("management:accept_project_invitation")
+        data = {"token": invitation.token}
+
+        response = authenticated_client.post(url, data, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert "Welcome to" in response.data["message"]
+        assert response.data["role"] == "developer"
+
+        # Verify invitation was accepted
+        invitation.refresh_from_db()
+        assert invitation.is_accepted is True
+
+    def test_accept_invitation_invalid_token(self, authenticated_client, mock_auth_service):
+        """Test accepting invitation with invalid token."""
+        url = reverse("management:accept_project_invitation")
+        data = {"token": "invalid-token-12345"}
+
+        response = authenticated_client.post(url, data, format="json")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_validate_invitation_token(self, authenticated_client, project, mock_auth_service):
+        """Test validating invitation token without accepting."""
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=uuid.uuid4(),
+            invitee_email="invitee@example.com",
+            role="supervisor",
+        )
+
+        url = reverse("management:accept_project_invitation") + f"?token={invitation.token}"
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["role"] == "supervisor"
+
+        # Verify invitation was NOT accepted
+        invitation.refresh_from_db()
+        assert invitation.is_accepted is False
+
+    def test_accept_invitation_unauthenticated(self, api_client, project):
+        """Test unauthenticated users cannot accept invitations."""
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=uuid.uuid4(),
+            invitee_email="invitee@example.com",
+            role="developer",
+        )
+
+        url = reverse("management:accept_project_invitation")
+        data = {"token": invitation.token}
+
+        response = api_client.post(url, data, format="json")
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED

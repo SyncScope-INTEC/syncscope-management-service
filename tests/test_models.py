@@ -12,6 +12,7 @@ from apps.management.models import (
     Integration,
     OrganizationSettings,
     Project,
+    ProjectInvitation,
     ProjectMember,
     Team,
     TeamMember,
@@ -673,3 +674,242 @@ class TestOrganizationSettingsModel:
         assert settings.deletion_protection_enabled is False
         assert settings.deletion_password_hash is None
         assert settings.failed_deletion_attempts == 0
+
+
+@pytest.mark.django_db
+class TestProjectInvitationModel:
+
+    def test_create_project_invitation_success(self, project, mock_user_data):
+        """Test successful project invitation creation."""
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=mock_user_data["user_id"],
+            invitee_email="invitee@example.com",
+            role="developer",
+        )
+
+        assert invitation.project == project
+        assert invitation.inviter_id == uuid.UUID(mock_user_data["user_id"])
+        assert invitation.invitee_email == "invitee@example.com"
+        assert invitation.role == "developer"
+        assert invitation.token is not None  # Auto-generated
+        assert len(invitation.token) > 0
+        assert invitation.expires_at is not None  # Auto-set to 7 days
+        assert invitation.is_accepted is False
+        assert invitation.accepted_at is None
+        assert invitation.accepted_by_id is None
+        assert invitation.auto_added_to_team is False
+
+    def test_invitation_token_auto_generation(self, project, mock_user_data):
+        """Test that token is auto-generated on save."""
+        invitation = ProjectInvitation(
+            project=project,
+            inviter_id=mock_user_data["user_id"],
+            invitee_email="test@example.com",
+            role="supervisor",
+        )
+        assert invitation.token is None or invitation.token == ""
+
+        invitation.save()
+        assert invitation.token is not None
+        assert len(invitation.token) > 0
+
+    def test_invitation_expiration_auto_set(self, project, mock_user_data):
+        """Test that expiration is auto-set to 7 days from creation."""
+        before_creation = timezone.now()
+
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=mock_user_data["user_id"],
+            invitee_email="test@example.com",
+            role="developer",
+        )
+
+        after_creation = timezone.now()
+        expected_expiration = before_creation + timedelta(days=7)
+
+        assert invitation.expires_at is not None
+        # Check that expiration is roughly 7 days from now (with some tolerance)
+        time_diff = abs((invitation.expires_at - expected_expiration).total_seconds())
+        assert time_diff < 5  # Within 5 seconds tolerance
+
+    def test_get_active_invitation_valid(self, project, mock_user_data):
+        """Test get_active_invitation returns valid invitations."""
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=mock_user_data["user_id"],
+            invitee_email="test@example.com",
+            role="developer",
+        )
+
+        found = ProjectInvitation.get_active_invitation(invitation.token)
+        assert found is not None
+        assert found.id == invitation.id
+
+    def test_get_active_invitation_expired(self, project, mock_user_data):
+        """Test get_active_invitation returns None for expired invitations."""
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=mock_user_data["user_id"],
+            invitee_email="test@example.com",
+            role="developer",
+        )
+
+        # Set expiration to the past
+        invitation.expires_at = timezone.now() - timedelta(days=1)
+        invitation.save()
+
+        found = ProjectInvitation.get_active_invitation(invitation.token)
+        assert found is None
+
+    def test_get_active_invitation_accepted(self, project, mock_user_data):
+        """Test get_active_invitation returns None for accepted invitations."""
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=mock_user_data["user_id"],
+            invitee_email="test@example.com",
+            role="developer",
+        )
+
+        # Mark as accepted
+        invitation.is_accepted = True
+        invitation.save()
+
+        found = ProjectInvitation.get_active_invitation(invitation.token)
+        assert found is None
+
+    def test_accept_invitation_success(self, project, team, mock_user_data):
+        """Test successful invitation acceptance."""
+        invitee_id = uuid.uuid4()
+
+        # Create team member first
+        TeamMember.objects.create(
+            team=team,
+            user_id=invitee_id,
+            role="developer",
+        )
+
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=mock_user_data["user_id"],
+            invitee_email="invitee@example.com",
+            role="supervisor",
+        )
+
+        invitation.accept(invitee_id)
+
+        # Check invitation status
+        assert invitation.is_accepted is True
+        assert invitation.accepted_at is not None
+        assert invitation.accepted_by_id == invitee_id
+        assert invitation.auto_added_to_team is False
+
+        # Check project member was created
+        member = ProjectMember.objects.get(project=project, user_id=invitee_id)
+        assert member.role == "supervisor"
+
+    def test_accept_invitation_auto_add_to_team(self, project, team, mock_user_data):
+        """Test that user is auto-added to team if not already a member."""
+        invitee_id = uuid.uuid4()
+
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=mock_user_data["user_id"],
+            invitee_email="invitee@example.com",
+            role="developer",
+        )
+
+        invitation.accept(invitee_id)
+
+        # Check user was auto-added to team
+        assert invitation.auto_added_to_team is True
+        team_member = TeamMember.objects.get(team=team, user_id=invitee_id)
+        assert team_member.role == "developer"
+
+        # Check project member was also created
+        project_member = ProjectMember.objects.get(project=project, user_id=invitee_id)
+        assert project_member.role == "developer"
+
+    def test_accept_invitation_already_accepted(self, project, team, mock_user_data):
+        """Test that accepting an already-accepted invitation raises error."""
+        invitee_id = uuid.uuid4()
+
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=mock_user_data["user_id"],
+            invitee_email="invitee@example.com",
+            role="developer",
+        )
+
+        invitation.accept(invitee_id)
+
+        with pytest.raises(ValueError, match="already been accepted"):
+            invitation.accept(invitee_id)
+
+    def test_accept_invitation_expired(self, project, mock_user_data):
+        """Test that accepting an expired invitation raises error."""
+        invitee_id = uuid.uuid4()
+
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=mock_user_data["user_id"],
+            invitee_email="invitee@example.com",
+            role="developer",
+        )
+
+        # Set expiration to the past
+        invitation.expires_at = timezone.now() - timedelta(days=1)
+        invitation.save()
+
+        with pytest.raises(ValueError, match="expired"):
+            invitation.accept(invitee_id)
+
+    def test_accept_invitation_already_project_member(self, project, team, mock_user_data):
+        """Test that user already in project cannot accept invitation."""
+        invitee_id = uuid.uuid4()
+
+        # Add user to team and project first
+        TeamMember.objects.create(team=team, user_id=invitee_id, role="developer")
+        ProjectMember.objects.create(project=project, user_id=invitee_id, role="contributor")
+
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=mock_user_data["user_id"],
+            invitee_email="invitee@example.com",
+            role="developer",
+        )
+
+        with pytest.raises(ValueError, match="already a member"):
+            invitation.accept(invitee_id)
+
+    def test_invitation_str_representation(self, project, mock_user_data):
+        """Test invitation string representation."""
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=mock_user_data["user_id"],
+            invitee_email="test@example.com",
+            role="developer",
+        )
+
+        expected = f"Invitation to test@example.com for {project.name}"
+        assert str(invitation) == expected
+
+    def test_invitation_ordering(self, project, mock_user_data):
+        """Test that invitations are ordered by creation date (newest first)."""
+        inv1 = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=mock_user_data["user_id"],
+            invitee_email="first@example.com",
+            role="developer",
+        )
+
+        inv2 = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=mock_user_data["user_id"],
+            invitee_email="second@example.com",
+            role="supervisor",
+        )
+
+        invitations = list(ProjectInvitation.objects.all())
+        assert invitations[0] == inv2  # Newest first
+        assert invitations[1] == inv1
