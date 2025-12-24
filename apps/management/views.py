@@ -12,23 +12,39 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from config.database_retry import atomic_with_retry
 
 from .authentication import AuthServiceIntegration
 from .db_mixins import ServerlessViewMixin
-from .models import CodeCommit, GitHubIntegration, Integration, OrganizationSettings, Project, ProjectMember, Team, TeamMember
+from .models import (
+    CodeCommit,
+    GitHubIntegration,
+    Integration,
+    OrganizationSettings,
+    Project,
+    ProjectInvitation,
+    ProjectMember,
+    Team,
+    TeamMember,
+)
 from .permissions import IsOwnerOrAdmin, IsProjectMemberOrAdmin, IsTeamMemberOrAdmin
 from .serializers import (
+    AcceptProjectInvitationResponseSerializer,
+    AcceptProjectInvitationSerializer,
     CodeCommitSerializer,
+    CreateProjectInvitationSerializer,
     ErrorResponseSerializer,
     GitHubIntegrationSerializer,
     IntegrationCreateSerializer,
     IntegrationSerializer,
+    InviteProjectUserResponseSerializer,
     OrganizationSettingsSerializer,
     OrganizationSettingsUpdateSerializer,
     ProjectCreateSerializer,
     ProjectDetailSerializer,
+    ProjectInvitationSerializer,
     ProjectMemberCreateSerializer,
     ProjectMemberSerializer,
     ProjectSerializer,
@@ -1204,3 +1220,209 @@ class OrganizationSettingsViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
 
         except Exception as e:
             logger.error(f"Error sending failed attempt alert: {e}", exc_info=True)
+
+
+# ==================== Project Invitation Views ====================
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Project Invitations"],
+        summary="Invite a user to join a project",
+        description=(
+            "Send an invitation email to a user to join a specific project. "
+            "Requires authentication. Only admins and supervisors can invite. "
+            "The invitee will receive an email with a link to accept the invitation. "
+            "If the user is not already a team member, they will be automatically added to the team."
+        ),
+        request=CreateProjectInvitationSerializer,
+        responses={
+            201: InviteProjectUserResponseSerializer,
+            400: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
+    ),
+    get=extend_schema(
+        tags=["Project Invitations"],
+        summary="List project invitations",
+        description=(
+            "Get a list of invitations. Query parameters: "
+            "- project: Filter by project ID "
+            "- sent_by_me: Show only invitations sent by current user (true/false) "
+            "- status: Filter by status (pending/accepted/expired)"
+        ),
+        responses={
+            200: ProjectInvitationSerializer(many=True),
+            401: ErrorResponseSerializer,
+        },
+    ),
+)
+class ProjectInvitationView(ServerlessViewMixin, APIView):
+    """Create and list project invitations."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @atomic_with_retry()
+    def post(self, request):
+        """Send a project invitation."""
+        from .utils import send_project_invitation_email
+
+        user = request.user
+
+        # Check if user has admin or supervisor role
+        if not hasattr(user, "role") or user.role not in ["admin", "supervisor"]:
+            return Response(
+                {"error": "Only admins and supervisors can send project invitations"}, status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Validate input
+        serializer = CreateProjectInvitationSerializer(data=request.data, context={"request": request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        project = serializer.context["project"]
+        invitee_email = serializer.validated_data["invitee_email"]
+        role = serializer.validated_data["role"]
+
+        # Create the invitation
+        invitation = ProjectInvitation.objects.create(
+            project=project, inviter_id=user.id, invitee_email=invitee_email, role=role
+        )
+
+        # Send invitation email
+        user_name = f"{user.first_name} {user.last_name}".strip() if hasattr(user, "first_name") else str(user.email)
+        email_sent = send_project_invitation_email(
+            invitee_email=invitee_email,
+            inviter_name=user_name or str(user.email),
+            inviter_email=user.email,
+            project_name=project.name,
+            team_name=project.team.name,
+            role=role,
+            invitation_token=invitation.token,
+        )
+
+        if not email_sent:
+            # Log warning but don't fail
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to send project invitation email to {invitee_email}")
+
+        return Response(
+            {
+                "message": f"Invitation sent to {invitee_email}",
+                "invitation_id": invitation.id,
+                "invitee_email": invitee_email,
+                "project_name": project.name,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    def get(self, request):
+        """List project invitations with filtering."""
+        user = request.user
+
+        # Base queryset - show invitations for projects user can access
+        if hasattr(user, "role") and user.role == "admin":
+            queryset = ProjectInvitation.objects.all()
+        else:
+            # Get user's teams
+            user_teams = TeamMember.objects.filter(user_id=user.id).values_list("team", flat=True)
+            # Get projects from those teams
+            user_projects = Project.objects.filter(team__in=user_teams).values_list("id", flat=True)
+            queryset = ProjectInvitation.objects.filter(project__in=user_projects)
+
+        # Apply filters
+        project_id = request.query_params.get("project")
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+
+        sent_by_me = request.query_params.get("sent_by_me")
+        if sent_by_me and sent_by_me.lower() == "true":
+            queryset = queryset.filter(inviter_id=user.id)
+
+        status_filter = request.query_params.get("status")
+        if status_filter == "pending":
+            queryset = queryset.filter(is_accepted=False, expires_at__gt=timezone.now())
+        elif status_filter == "accepted":
+            queryset = queryset.filter(is_accepted=True)
+        elif status_filter == "expired":
+            queryset = queryset.filter(is_accepted=False, expires_at__lte=timezone.now())
+
+        queryset = queryset.order_by("-created_at")
+        serializer = ProjectInvitationSerializer(queryset, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Project Invitations"],
+        summary="Accept a project invitation",
+        description=(
+            "Accept a project invitation using the token from the email. "
+            "The user will be added to the project with the specified role. "
+            "If not already a team member, they will be automatically added to the team."
+        ),
+        request=AcceptProjectInvitationSerializer,
+        responses={
+            200: AcceptProjectInvitationResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
+    ),
+    get=extend_schema(
+        tags=["Project Invitations"],
+        summary="Validate invitation token",
+        description="Validate a project invitation token without accepting it. Returns invitation details if valid.",
+        responses={
+            200: ProjectInvitationSerializer,
+            400: ErrorResponseSerializer,
+        },
+    ),
+)
+class AcceptProjectInvitationView(ServerlessViewMixin, APIView):
+    """Accept or validate a project invitation."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @atomic_with_retry()
+    def post(self, request):
+        """Accept a project invitation."""
+        serializer = AcceptProjectInvitationSerializer(data=request.data, context={"request": request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        invitation = serializer.context["invitation"]
+        user = request.user
+
+        # Accept the invitation (this handles all the business logic)
+        try:
+            invitation.accept(user.id)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {
+                "message": f"Welcome to {invitation.project.name}!",
+                "project_name": invitation.project.name,
+                "team_name": invitation.project.team.name,
+                "role": invitation.role,
+                "auto_added_to_team": invitation.auto_added_to_team,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def get(self, request):
+        """Validate invitation token and return invitation details."""
+        token = request.query_params.get("token")
+        if not token:
+            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        invitation = ProjectInvitation.get_active_invitation(token)
+        if not invitation:
+            return Response({"error": "Invalid or expired invitation token"}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = ProjectInvitationSerializer(invitation)
+        return Response(serializer.data, status=status.HTTP_200_OK)

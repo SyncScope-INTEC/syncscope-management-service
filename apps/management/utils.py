@@ -100,3 +100,57 @@ def extract_domain_from_email(email):
     if "@" not in email:
         return None
     return f"@{email.split('@')[1]}"
+
+
+def send_project_invitation_email(
+    invitee_email, inviter_name, inviter_email, project_name, team_name, role, invitation_token
+):
+    """
+    Send project invitation email via alerts-service.
+
+    Args:
+        invitee_email: Email of person being invited
+        inviter_name: Name of person sending invitation
+        inviter_email: Email of person sending invitation
+        project_name: Name of the project
+        team_name: Name of the team
+        role: Project role (supervisor/developer)
+        invitation_token: Unique invitation token
+
+    Returns:
+        bool: True if email was sent successfully, False otherwise
+    """
+    import logging
+
+    import requests
+
+    logger = logging.getLogger(__name__)
+
+    alerts_service_url = settings.ALERTS_SERVICE_URL
+    frontend_url = settings.FRONTEND_URL
+
+    # Prepare the payload
+    payload = {
+        "invitee_email": invitee_email,
+        "inviter_name": inviter_name,
+        "inviter_email": inviter_email,
+        "project_name": project_name,
+        "team_name": team_name,
+        "role": role,
+        "invitation_token": invitation_token,
+        "frontend_url": frontend_url,
+        "expiration_days": 7,
+    }
+
+    try:
+        # Call alerts-service API
+        response = requests.post(
+            f"{alerts_service_url}/alerts/send-project-invitation-email/",
+            json=payload,
+            timeout=10,
+        )
+        return response.status_code == 200
+    except Exception as e:
+        # Log error but don't expose to user
+        logger.error(f"Error sending project invitation email: {str(e)}")
+        return False

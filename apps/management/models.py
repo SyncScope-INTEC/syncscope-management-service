@@ -420,6 +420,8 @@ class ProjectMember(RetryableModelMixin, models.Model):
         ("owner", "Project Owner"),
         ("contributor", "Contributor"),
         ("viewer", "Viewer"),
+        ("supervisor", "Supervisor"),
+        ("developer", "Developer"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -457,6 +459,127 @@ class ProjectMember(RetryableModelMixin, models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class ProjectInvitation(RetryableModelMixin, models.Model):
+    """
+    Model for tracking project invitations.
+    Allows admins and supervisors to invite users to join specific projects.
+    Invited users are automatically added to the project's team if not already members.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="invitations",
+        db_column="project_id",
+        help_text="Project to which the user is being invited",
+    )
+    inviter_id = models.UUIDField(help_text="Reference to auth.users.id - User who sent the invitation")
+    invitee_email = models.EmailField(help_text="Email address of the person being invited")
+    role = models.CharField(
+        max_length=50,
+        choices=[("supervisor", "Supervisor"), ("developer", "Developer")],
+        default="developer",
+        help_text="Project role for the invited user",
+    )
+    token = models.CharField(max_length=255, unique=True, help_text="Unique invitation token")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(help_text="Invitation expires after 7 days")
+    is_accepted = models.BooleanField(default=False, help_text="Whether the invitation has been accepted")
+    accepted_at = models.DateTimeField(null=True, blank=True, help_text="When the invitation was accepted")
+    accepted_by_id = models.UUIDField(null=True, blank=True, help_text="User ID who accepted the invitation")
+    auto_added_to_team = models.BooleanField(
+        default=False, help_text="Whether user was automatically added to team upon acceptance"
+    )
+
+    objects = RetryableManager()
+
+    class Meta:
+        db_table = get_table_name("project_invitations")
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["project"]),
+            models.Index(fields=["invitee_email"]),
+            models.Index(fields=["token"]),
+            models.Index(fields=["expires_at"]),
+            models.Index(fields=["inviter_id"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "invitee_email"],
+                condition=models.Q(is_accepted=False, expires_at__gt=timezone.now()),
+                name="unique_active_project_invitation",
+            )
+        ]
+
+    def __str__(self):
+        return f"Invitation to {self.invitee_email} for {self.project.name}"
+
+    def save(self, *args, **kwargs):
+        """Set token and expiration on creation."""
+        if not self.token:
+            import secrets
+
+            self.token = secrets.token_urlsafe(32)
+
+        if not self.expires_at:
+            from datetime import timedelta
+
+            self.expires_at = timezone.now() + timedelta(days=7)
+
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_active_invitation(cls, token):
+        """Get an active (not expired, not accepted) invitation by token."""
+        try:
+            invitation = cls.objects.get(token=token, is_accepted=False, expires_at__gt=timezone.now())
+            return invitation
+        except cls.DoesNotExist:
+            return None
+
+    @atomic_with_retry()
+    def accept(self, user_id):
+        """
+        Accept the invitation and add user to project.
+        Auto-adds user to team if not already a member.
+
+        Args:
+            user_id: UUID of the accepting user
+
+        Raises:
+            ValueError: If invitation is already accepted or expired
+        """
+        # Validate invitation state
+        if self.is_accepted:
+            raise ValueError("This invitation has already been accepted")
+
+        if self.expires_at <= timezone.now():
+            raise ValueError("This invitation has expired")
+
+        # Check if user is already a project member
+        if ProjectMember.objects.filter(project=self.project, user_id=user_id).exists():
+            raise ValueError("You are already a member of this project")
+
+        # Check if user is a team member, if not add them
+        team = self.project.team
+        is_team_member = TeamMember.objects.filter(team=team, user_id=user_id).exists()
+
+        if not is_team_member:
+            # Auto-add to team with developer role
+            TeamMember.objects.create(team=team, user_id=user_id, role="developer")
+            self.auto_added_to_team = True
+
+        # Add user to project
+        ProjectMember.objects.create(project=self.project, user_id=user_id, role=self.role)
+
+        # Mark invitation as accepted
+        self.is_accepted = True
+        self.accepted_at = timezone.now()
+        self.accepted_by_id = user_id
+        self.save()
 
 
 class CodeCommit(RetryableModelMixin, models.Model):

@@ -6,10 +6,12 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    AcceptProjectInvitationView,
     CodeCommitViewSet,
     GitHubIntegrationViewSet,
     IntegrationViewSet,
     OrganizationSettingsViewSet,
+    ProjectInvitationView,
     ProjectMemberViewSet,
     ProjectViewSet,
     TeamMemberViewSet,
@@ -39,4 +41,7 @@ urlpatterns = [
     path("users/<uuid:user_id>/projects/", get_user_projects, name="get_user_projects"),
     # Analytics integration endpoints
     path("git-events/team/", get_git_events_team, name="get_git_events_team"),
+    # Project invitation endpoints
+    path("project-invitations/", ProjectInvitationView.as_view(), name="project_invitations"),
+    path("project-invitations/accept/", AcceptProjectInvitationView.as_view(), name="accept_project_invitation"),
 ]
