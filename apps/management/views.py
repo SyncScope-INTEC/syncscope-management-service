@@ -57,6 +57,7 @@ from .serializers import (
     VerifyDeletionPasswordResponseSerializer,
     VerifyDeletionPasswordSerializer,
 )
+from .utils import send_project_invitation_email
 
 
 @api_view(["GET"])
@@ -1266,8 +1267,6 @@ class ProjectInvitationView(ServerlessViewMixin, APIView):
     @atomic_with_retry()
     def post(self, request):
         """Send a project invitation."""
-        from .utils import send_project_invitation_email
-
         user = request.user
 
         # Check if user has admin or supervisor role

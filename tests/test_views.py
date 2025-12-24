@@ -1520,7 +1520,7 @@ class TestProjectInvitationView:
             "role": "developer",
         }
 
-        with patch("apps.management.utils.send_project_invitation_email") as mock_email:
+        with patch("apps.management.views.send_project_invitation_email") as mock_email:
             mock_email.return_value = True
             response = admin_authenticated_client.post(url, data, format="json")
 
@@ -1544,7 +1544,7 @@ class TestProjectInvitationView:
             "role": "supervisor",
         }
 
-        with patch("apps.management.utils.send_project_invitation_email") as mock_email:
+        with patch("apps.management.views.send_project_invitation_email") as mock_email:
             mock_email.return_value = True
             response = authenticated_client.post(url, data, format="json")
 
