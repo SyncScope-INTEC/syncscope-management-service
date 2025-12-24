@@ -102,9 +102,7 @@ def extract_domain_from_email(email):
     return f"@{email.split('@')[1]}"
 
 
-def send_project_invitation_email(
-    invitee_email, inviter_name, inviter_email, project_name, team_name, role, invitation_token
-):
+def send_project_invitation_email(invitee_email, inviter_name, inviter_email, project_name, team_name, role, invitation_token):
     """
     Send project invitation email via alerts-service.
 

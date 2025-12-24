@@ -692,9 +692,7 @@ class CreateProjectInvitationSerializer(serializers.Serializer):
 
     project_id = serializers.UUIDField(required=True)
     invitee_email = serializers.EmailField(required=True)
-    role = serializers.ChoiceField(
-        choices=[("supervisor", "Supervisor"), ("developer", "Developer")], default="developer"
-    )
+    role = serializers.ChoiceField(choices=[("supervisor", "Supervisor"), ("developer", "Developer")], default="developer")
 
     def validate_invitee_email(self, value):
         """Validate email format."""
