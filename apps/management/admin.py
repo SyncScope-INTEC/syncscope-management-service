@@ -452,6 +452,7 @@ class ProjectAdmin(admin.ModelAdmin):
         total_skipped = 0
         total_errors = 0
         projects_synced = 0
+        all_error_messages = []
 
         for project in queryset:
             try:
@@ -460,20 +461,26 @@ class ProjectAdmin(admin.ModelAdmin):
                     total_created += results["total_created"]
                     total_skipped += results["total_skipped"]
                     total_errors += results["total_errors"]
+                    # Collect error messages
+                    if results.get("monitoring") and results["monitoring"].get("errors"):
+                        all_error_messages.extend(results["monitoring"]["errors"])
+                    if results.get("github") and results["github"].get("errors"):
+                        all_error_messages.extend(results["github"]["errors"])
                 projects_synced += 1
             except Exception as e:
                 total_errors += 1
-                self.message_user(
-                    request,
-                    f"Error syncing {project.name}: {str(e)}",
-                    level="error",
-                )
+                all_error_messages.append(f"{project.name}: {str(e)}")
 
+        # Show main result message
         self.message_user(
             request,
             f"Synced {projects_synced} project(s): {total_created} commits created, {total_skipped} skipped, {total_errors} errors",
             level="success" if total_errors == 0 else "warning",
         )
+
+        # Show detailed error messages if any
+        for error in all_error_messages[:5]:  # Limit to 5 error messages
+            self.message_user(request, error, level="error")
 
 
 @admin.register(TeamMember)
@@ -589,6 +596,7 @@ class GitHubIntegrationAdmin(admin.ModelAdmin):
         total_created = 0
         total_skipped = 0
         total_errors = 0
+        all_error_messages = []
 
         for integration in queryset:
             try:
@@ -596,19 +604,25 @@ class GitHubIntegrationAdmin(admin.ModelAdmin):
                 total_created += results["total_created"]
                 total_skipped += results["total_skipped"]
                 total_errors += results["total_errors"]
+                # Collect error messages
+                if results.get("monitoring") and results["monitoring"].get("errors"):
+                    all_error_messages.extend(results["monitoring"]["errors"])
+                if results.get("github") and results["github"].get("errors"):
+                    all_error_messages.extend(results["github"]["errors"])
             except Exception as e:
                 total_errors += 1
-                self.message_user(
-                    request,
-                    f"Error syncing {integration}: {str(e)}",
-                    level="error",
-                )
+                all_error_messages.append(f"{integration}: {str(e)}")
 
+        # Show main result message
         self.message_user(
             request,
             f"Sync completed: {total_created} commits created, {total_skipped} skipped, {total_errors} errors",
             level="success" if total_errors == 0 else "warning",
         )
+
+        # Show detailed error messages if any
+        for error in all_error_messages[:5]:  # Limit to 5 error messages
+            self.message_user(request, error, level="error")
 
 
 @admin.register(CodeCommit)

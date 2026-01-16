@@ -57,6 +57,7 @@ def sync_from_monitoring_service(
         since = integration.last_sync
 
     monitoring_service_url = getattr(settings, "MONITORING_SERVICE_URL", "http://localhost:8001")
+    api_endpoint = f"{monitoring_service_url}/monitoring/api/git-events/"
 
     try:
         # Build request parameters
@@ -69,16 +70,19 @@ def sync_from_monitoring_service(
         if since:
             params["since"] = since.isoformat()
 
+        logger.info(f"Calling monitoring service at {api_endpoint} for {repository_url}")
+
         # Call monitoring service API
         response = requests.get(
-            f"{monitoring_service_url}/monitoring/api/git-events/",
+            api_endpoint,
             params=params,
             timeout=30,
         )
 
         if response.status_code != 200:
-            result.errors.append(f"Monitoring service returned status {response.status_code}")
-            logger.error(f"Failed to fetch git events from monitoring service: {response.text}")
+            error_msg = f"Monitoring service ({api_endpoint}) returned status {response.status_code}"
+            result.errors.append(error_msg)
+            logger.error(f"Failed to fetch git events: {response.text[:500]}")
             return result
 
         data = response.json()
@@ -129,8 +133,9 @@ def sync_from_monitoring_service(
                 logger.error(f"Error creating CodeCommit: {e}")
 
     except requests.RequestException as e:
-        result.errors.append(f"Failed to connect to monitoring service: {str(e)}")
-        logger.error(f"Failed to connect to monitoring service: {e}")
+        error_msg = f"Failed to connect to monitoring service ({api_endpoint}): {str(e)}"
+        result.errors.append(error_msg)
+        logger.error(error_msg)
 
     return result
 
@@ -187,18 +192,21 @@ def sync_from_github_api(
             response = requests.get(api_url, headers=headers, params=params, timeout=30)
 
             if response.status_code == 401:
-                result.errors.append("GitHub authentication failed - invalid or expired token")
-                logger.error("GitHub API authentication failed")
+                error_msg = f"GitHub authentication failed for {integration.repository_owner}/{integration.repository_name} - token may be invalid or expired. Please re-authenticate with GitHub."
+                result.errors.append(error_msg)
+                logger.error(error_msg)
                 break
 
             if response.status_code == 404:
-                result.errors.append("Repository not found or no access")
-                logger.error(f"Repository not found: {integration.repository_owner}/{integration.repository_name}")
+                error_msg = f"Repository {integration.repository_owner}/{integration.repository_name} not found or no access with current token"
+                result.errors.append(error_msg)
+                logger.error(error_msg)
                 break
 
             if response.status_code != 200:
-                result.errors.append(f"GitHub API returned status {response.status_code}")
-                logger.error(f"GitHub API error: {response.text}")
+                error_msg = f"GitHub API returned status {response.status_code} for {integration.repository_owner}/{integration.repository_name}"
+                result.errors.append(error_msg)
+                logger.error(f"GitHub API error: {response.text[:500]}")
                 break
 
             commits = response.json()
