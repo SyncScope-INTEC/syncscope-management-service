@@ -418,6 +418,7 @@ class ProjectAdmin(admin.ModelAdmin):
     search_fields = ("name", "description", "repository_url", "url")
     readonly_fields = ("id", "created_at", "updated_at")
     inlines = [IntegrationInline, GitHubIntegrationInline, CodeCommitInline, ProjectMemberInline]
+    actions = ["sync_all_commits"]
 
     fieldsets = (
         ("Basic Information", {"fields": ("name", "description", "team")}),
@@ -441,6 +442,38 @@ class ProjectAdmin(admin.ModelAdmin):
         return format_html('<span style="color: #9900cc;">{}</span>', count)
 
     commits_count.short_description = "Commits"
+
+    @admin.action(description="Sync commits for all GitHub integrations")
+    def sync_all_commits(self, request, queryset):
+        """Sync commits for all GitHub integrations of selected projects."""
+        from .sync_service import sync_all_project_integrations
+
+        total_created = 0
+        total_skipped = 0
+        total_errors = 0
+        projects_synced = 0
+
+        for project in queryset:
+            try:
+                results_list = sync_all_project_integrations(project)
+                for results in results_list:
+                    total_created += results["total_created"]
+                    total_skipped += results["total_skipped"]
+                    total_errors += results["total_errors"]
+                projects_synced += 1
+            except Exception as e:
+                total_errors += 1
+                self.message_user(
+                    request,
+                    f"Error syncing {project.name}: {str(e)}",
+                    level="error",
+                )
+
+        self.message_user(
+            request,
+            f"Synced {projects_synced} project(s): {total_created} commits created, {total_skipped} skipped, {total_errors} errors",
+            level="success" if total_errors == 0 else "warning",
+        )
 
 
 @admin.register(TeamMember)
@@ -509,6 +542,7 @@ class GitHubIntegrationAdmin(admin.ModelAdmin):
     list_filter = ("is_active", "last_sync", "created_at", "updated_at")
     search_fields = ("project__name", "repository_owner", "repository_name")
     readonly_fields = ("id", "repository_url", "last_sync", "created_at", "updated_at")
+    actions = ["sync_commits"]
 
     fieldsets = (
         (
@@ -546,6 +580,35 @@ class GitHubIntegrationAdmin(admin.ModelAdmin):
         )
 
     repository_display.short_description = "Repository"
+
+    @admin.action(description="Sync commits from monitoring service and GitHub API")
+    def sync_commits(self, request, queryset):
+        """Sync commits for selected GitHub integrations."""
+        from .sync_service import sync_integration
+
+        total_created = 0
+        total_skipped = 0
+        total_errors = 0
+
+        for integration in queryset:
+            try:
+                results = sync_integration(integration)
+                total_created += results["total_created"]
+                total_skipped += results["total_skipped"]
+                total_errors += results["total_errors"]
+            except Exception as e:
+                total_errors += 1
+                self.message_user(
+                    request,
+                    f"Error syncing {integration}: {str(e)}",
+                    level="error",
+                )
+
+        self.message_user(
+            request,
+            f"Sync completed: {total_created} commits created, {total_skipped} skipped, {total_errors} errors",
+            level="success" if total_errors == 0 else "warning",
+        )
 
 
 @admin.register(CodeCommit)

@@ -764,21 +764,49 @@ class GitHubIntegrationViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
     @extend_schema(
         tags=["Integrations"],
         summary="Sync GitHub integration",
-        description="Trigger a manual sync for a GitHub integration.",
+        description="Trigger a manual sync for a GitHub integration. Fetches commits from both the monitoring service and GitHub API.",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "sync_monitoring": {"type": "boolean", "default": True, "description": "Sync from monitoring service"},
+                    "sync_github": {"type": "boolean", "default": True, "description": "Sync from GitHub API"},
+                },
+            }
+        },
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string"},
+                    "results": {"type": "object"},
+                },
+            }
+        },
     )
     @action(detail=True, methods=["post"])
     def sync(self, request, pk=None):
         """Trigger manual sync for GitHub integration."""
+        from .sync_service import sync_integration
+
         integration = self.get_object()
 
-        # TODO: Implement GitHub sync logic
-        # This would fetch latest commits, pull requests, etc.
+        # Get sync options from request body
+        sync_monitoring = request.data.get("sync_monitoring", True)
+        sync_github = request.data.get("sync_github", True)
 
-        integration.last_sync = timezone.now()
-        integration.save()
+        # Perform sync from both sources
+        results = sync_integration(
+            integration,
+            sync_monitoring=sync_monitoring,
+            sync_github=sync_github,
+        )
 
         return Response(
-            {"message": "GitHub sync triggered successfully."},
+            {
+                "message": "GitHub sync completed successfully.",
+                "results": results,
+            },
             status=status.HTTP_200_OK,
         )
 
