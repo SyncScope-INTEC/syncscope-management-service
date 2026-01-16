@@ -1,3 +1,5 @@
+from unittest.mock import Mock, patch
+
 import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import AnonymousUser
@@ -141,6 +143,72 @@ class TestProjectAdmin:
         assert Integration in inline_models
         assert GitHubIntegration in inline_models
         assert CodeCommit in inline_models
+
+    def test_project_admin_has_sync_action(self):
+        """Test project admin has sync action."""
+        admin_site = AdminSite()
+        admin = ProjectAdmin(Project, admin_site)
+
+        assert "sync_all_commits" in admin.actions
+
+    @patch("apps.management.admin.sync_all_project_integrations")
+    def test_project_admin_sync_action(self, mock_sync, project, rf):
+        """Test sync_all_commits admin action."""
+        from django.contrib.admin.sites import AdminSite
+        from django.contrib.messages.storage.fallback import FallbackStorage
+
+        mock_sync.return_value = [
+            {
+                "total_created": 5,
+                "total_skipped": 2,
+                "total_errors": 0,
+                "monitoring": {"errors": []},
+                "github": {"errors": []},
+            }
+        ]
+
+        admin_site = AdminSite()
+        admin = ProjectAdmin(Project, admin_site)
+
+        request = rf.post("/admin/management/project/")
+        request.user = Mock()
+        setattr(request, "session", "session")
+        messages = FallbackStorage(request)
+        setattr(request, "_messages", messages)
+
+        admin.sync_all_commits(request, Project.objects.filter(id=project.id))
+
+        mock_sync.assert_called_once_with(project)
+
+    @patch("apps.management.admin.sync_all_project_integrations")
+    def test_project_admin_sync_action_with_errors(self, mock_sync, project, rf):
+        """Test sync_all_commits admin action shows error messages."""
+        from django.contrib.admin.sites import AdminSite
+        from django.contrib.messages.storage.fallback import FallbackStorage
+
+        mock_sync.return_value = [
+            {
+                "total_created": 0,
+                "total_skipped": 0,
+                "total_errors": 2,
+                "monitoring": {"errors": ["Connection failed"]},
+                "github": {"errors": ["Auth failed"]},
+            }
+        ]
+
+        admin_site = AdminSite()
+        admin = ProjectAdmin(Project, admin_site)
+
+        request = rf.post("/admin/management/project/")
+        request.user = Mock()
+        setattr(request, "session", "session")
+        messages = FallbackStorage(request)
+        setattr(request, "_messages", messages)
+
+        admin.sync_all_commits(request, Project.objects.filter(id=project.id))
+
+        # Check that error messages were collected
+        mock_sync.assert_called_once()
 
 
 @pytest.mark.django_db
