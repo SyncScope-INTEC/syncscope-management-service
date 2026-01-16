@@ -1,6 +1,6 @@
 import json
 import uuid
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from django.urls import reverse
@@ -557,8 +557,10 @@ class TestGitHubIntegrationViewSet:
         assert response.data["repository_name"] == github_integration.repository_name
         assert "repository_url" in response.data
 
+    @patch("apps.management.sync_service.requests.get")
     def test_github_integration_sync(
         self,
+        mock_requests_get,
         authenticated_client,
         github_integration,
         team_with_lead,
@@ -569,12 +571,31 @@ class TestGitHubIntegrationViewSet:
         github_integration.project.team = team
         github_integration.project.save()
 
+        # Mock the monitoring service response (no git events)
+        mock_monitoring_response = Mock()
+        mock_monitoring_response.status_code = 200
+        mock_monitoring_response.json.return_value = {"git_events": [], "count": 0}
+
+        # Mock the GitHub API response (no commits)
+        mock_github_response = Mock()
+        mock_github_response.status_code = 200
+        mock_github_response.json.return_value = []
+
+        # Configure mock to return different responses based on URL
+        def side_effect(url, **kwargs):
+            if "github.com" in url:
+                return mock_github_response
+            return mock_monitoring_response
+
+        mock_requests_get.side_effect = side_effect
+
         url = reverse("management:githubintegration-sync", args=[github_integration.id])
 
         response = authenticated_client.post(url)
 
         assert response.status_code == status.HTTP_200_OK
-        assert "sync triggered successfully" in response.data["message"].lower()
+        assert "sync completed successfully" in response.data["message"].lower()
+        assert "results" in response.data
 
 
 @pytest.mark.django_db
