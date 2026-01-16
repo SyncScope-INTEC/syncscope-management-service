@@ -226,8 +226,7 @@ def sync_from_github_api(
             # Get existing commit hashes in bulk for efficiency
             existing_hashes = set(
                 CodeCommit.objects.filter(
-                    project=project,
-                    commit_hash__in=[c.get("sha") for c in commits if c.get("sha")]
+                    project=project, commit_hash__in=[c.get("sha") for c in commits if c.get("sha")]
                 ).values_list("commit_hash", flat=True)
             )
 
@@ -256,18 +255,20 @@ def sync_from_github_api(
                         timestamp = timezone.now()
 
                     # Prepare CodeCommit object for bulk creation
-                    commits_to_create.append(CodeCommit(
-                        project=project,
-                        commit_hash=commit_hash,
-                        author_email=author_info.get("email") or "unknown@example.com",
-                        author_name=author_info.get("name") or "Unknown",
-                        message=commit_info.get("message") or "",
-                        branch=branch or "main",
-                        timestamp=timestamp,
-                        files_changed=len(commit_data.get("files", [])) if "files" in commit_data else 0,
-                        insertions=stats.get("additions", 0),
-                        deletions=stats.get("deletions", 0),
-                    ))
+                    commits_to_create.append(
+                        CodeCommit(
+                            project=project,
+                            commit_hash=commit_hash,
+                            author_email=author_info.get("email") or "unknown@example.com",
+                            author_name=author_info.get("name") or "Unknown",
+                            message=commit_info.get("message") or "",
+                            branch=branch or "main",
+                            timestamp=timestamp,
+                            files_changed=len(commit_data.get("files", [])) if "files" in commit_data else 0,
+                            insertions=stats.get("additions", 0),
+                            deletions=stats.get("deletions", 0),
+                        )
+                    )
 
                 except Exception as e:
                     result.errors.append(f"Error preparing commit {commit_data.get('sha', 'unknown')}: {str(e)}")
