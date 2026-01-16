@@ -151,7 +151,7 @@ class TestProjectAdmin:
 
         assert "sync_all_commits" in admin.actions
 
-    @patch("apps.management.admin.sync_all_project_integrations")
+    @patch("apps.management.sync_service.sync_all_project_integrations")
     def test_project_admin_sync_action(self, mock_sync, project, rf):
         """Test sync_all_commits admin action."""
         from django.contrib.admin.sites import AdminSite
@@ -180,7 +180,7 @@ class TestProjectAdmin:
 
         mock_sync.assert_called_once_with(project)
 
-    @patch("apps.management.admin.sync_all_project_integrations")
+    @patch("apps.management.sync_service.sync_all_project_integrations")
     def test_project_admin_sync_action_with_errors(self, mock_sync, project, rf):
         """Test sync_all_commits admin action shows error messages."""
         from django.contrib.admin.sites import AdminSite
