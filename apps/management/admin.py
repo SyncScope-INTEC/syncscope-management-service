@@ -418,7 +418,7 @@ class ProjectAdmin(admin.ModelAdmin):
     search_fields = ("name", "description", "repository_url", "url")
     readonly_fields = ("id", "created_at", "updated_at")
     inlines = [IntegrationInline, GitHubIntegrationInline, CodeCommitInline, ProjectMemberInline]
-    actions = ["sync_all_commits"]
+    actions = ["sync_all_commits", "full_sync_all_commits"]
 
     fieldsets = (
         ("Basic Information", {"fields": ("name", "description", "team")}),
@@ -475,6 +475,45 @@ class ProjectAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             f"Synced {projects_synced} project(s): {total_created} commits created, {total_skipped} skipped, {total_errors} errors",
+            level="success" if total_errors == 0 else "warning",
+        )
+
+        # Show detailed error messages if any
+        for error in all_error_messages[:5]:  # Limit to 5 error messages
+            self.message_user(request, error, level="error")
+
+    @admin.action(description="FULL SYNC - Fetch ALL commits (ignores last_sync timestamp)")
+    def full_sync_all_commits(self, request, queryset):
+        """Full sync - fetch all commits ignoring last_sync timestamp."""
+        from .sync_service import sync_all_project_integrations
+
+        total_created = 0
+        total_skipped = 0
+        total_errors = 0
+        projects_synced = 0
+        all_error_messages = []
+
+        for project in queryset:
+            try:
+                results_list = sync_all_project_integrations(project, full_sync=True)
+                for results in results_list:
+                    total_created += results["total_created"]
+                    total_skipped += results["total_skipped"]
+                    total_errors += results["total_errors"]
+                    # Collect error messages
+                    if results.get("monitoring") and results["monitoring"].get("errors"):
+                        all_error_messages.extend(results["monitoring"]["errors"])
+                    if results.get("github") and results["github"].get("errors"):
+                        all_error_messages.extend(results["github"]["errors"])
+                projects_synced += 1
+            except Exception as e:
+                total_errors += 1
+                all_error_messages.append(f"{project.name}: {str(e)}")
+
+        # Show main result message
+        self.message_user(
+            request,
+            f"FULL SYNC completed for {projects_synced} project(s): {total_created} commits created, {total_skipped} skipped, {total_errors} errors",
             level="success" if total_errors == 0 else "warning",
         )
 
@@ -549,7 +588,7 @@ class GitHubIntegrationAdmin(admin.ModelAdmin):
     list_filter = ("is_active", "last_sync", "created_at", "updated_at")
     search_fields = ("project__name", "repository_owner", "repository_name")
     readonly_fields = ("id", "repository_url", "last_sync", "created_at", "updated_at")
-    actions = ["sync_commits"]
+    actions = ["sync_commits", "full_sync_commits"]
 
     fieldsets = (
         (
@@ -617,6 +656,42 @@ class GitHubIntegrationAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             f"Sync completed: {total_created} commits created, {total_skipped} skipped, {total_errors} errors",
+            level="success" if total_errors == 0 else "warning",
+        )
+
+        # Show detailed error messages if any
+        for error in all_error_messages[:5]:  # Limit to 5 error messages
+            self.message_user(request, error, level="error")
+
+    @admin.action(description="FULL SYNC - Fetch ALL commits (ignores last_sync timestamp)")
+    def full_sync_commits(self, request, queryset):
+        """Full sync - fetch all commits ignoring last_sync timestamp."""
+        from .sync_service import sync_integration
+
+        total_created = 0
+        total_skipped = 0
+        total_errors = 0
+        all_error_messages = []
+
+        for integration in queryset:
+            try:
+                results = sync_integration(integration, full_sync=True)
+                total_created += results["total_created"]
+                total_skipped += results["total_skipped"]
+                total_errors += results["total_errors"]
+                # Collect error messages
+                if results.get("monitoring") and results["monitoring"].get("errors"):
+                    all_error_messages.extend(results["monitoring"]["errors"])
+                if results.get("github") and results["github"].get("errors"):
+                    all_error_messages.extend(results["github"]["errors"])
+            except Exception as e:
+                total_errors += 1
+                all_error_messages.append(f"{integration}: {str(e)}")
+
+        # Show main result message
+        self.message_user(
+            request,
+            f"FULL SYNC completed: {total_created} commits created, {total_skipped} skipped, {total_errors} errors",
             level="success" if total_errors == 0 else "warning",
         )
 

@@ -35,6 +35,7 @@ class SyncResult:
 def sync_from_monitoring_service(
     integration: GitHubIntegration,
     since: Optional[datetime] = None,
+    full_sync: bool = False,
 ) -> SyncResult:
     """
     Sync commits from the monitoring service's git_events table.
@@ -42,6 +43,7 @@ def sync_from_monitoring_service(
     Args:
         integration: GitHubIntegration instance containing repository info
         since: Only fetch events since this timestamp (defaults to last_sync or None)
+        full_sync: If True, ignore since/last_sync and fetch all commits
 
     Returns:
         SyncResult with statistics about the sync operation
@@ -52,8 +54,8 @@ def sync_from_monitoring_service(
     # Build the repository URL to filter by
     repository_url = f"https://github.com/{integration.repository_owner}/{integration.repository_name}"
 
-    # Use last_sync if since is not provided
-    if since is None and integration.last_sync:
+    # Use last_sync if since is not provided (unless full_sync is requested)
+    if not full_sync and since is None and integration.last_sync:
         since = integration.last_sync
 
     monitoring_service_url = getattr(settings, "MONITORING_SERVICE_URL", "http://localhost:8001")
@@ -144,6 +146,7 @@ def sync_from_github_api(
     integration: GitHubIntegration,
     since: Optional[datetime] = None,
     branch: Optional[str] = None,
+    full_sync: bool = False,
 ) -> SyncResult:
     """
     Sync commits directly from GitHub API.
@@ -152,6 +155,7 @@ def sync_from_github_api(
         integration: GitHubIntegration instance with repository info and access token
         since: Only fetch commits since this timestamp
         branch: Branch to fetch commits from (defaults to repository's default branch)
+        full_sync: If True, ignore since/last_sync and fetch all commits
 
     Returns:
         SyncResult with statistics about the sync operation
@@ -163,8 +167,8 @@ def sync_from_github_api(
         result.errors.append("No access token configured for this integration")
         return result
 
-    # Use last_sync if since is not provided
-    if since is None and integration.last_sync:
+    # Use last_sync if since is not provided (unless full_sync is requested)
+    if not full_sync and since is None and integration.last_sync:
         since = integration.last_sync
 
     # GitHub API endpoint for commits
@@ -284,6 +288,7 @@ def sync_integration(
     sync_monitoring: bool = True,
     sync_github: bool = True,
     since: Optional[datetime] = None,
+    full_sync: bool = False,
 ) -> dict:
     """
     Sync commits from both monitoring service and GitHub API.
@@ -293,6 +298,7 @@ def sync_integration(
         sync_monitoring: Whether to sync from monitoring service
         sync_github: Whether to sync from GitHub API
         since: Only fetch commits since this timestamp
+        full_sync: If True, ignore since/last_sync and fetch all commits
 
     Returns:
         Dictionary with sync results from both sources
@@ -307,7 +313,7 @@ def sync_integration(
 
     if sync_monitoring:
         logger.info(f"Syncing from monitoring service for {integration}")
-        monitoring_result = sync_from_monitoring_service(integration, since)
+        monitoring_result = sync_from_monitoring_service(integration, since, full_sync=full_sync)
         results["monitoring"] = {
             "commits_created": monitoring_result.commits_created,
             "commits_skipped": monitoring_result.commits_skipped,
@@ -319,7 +325,7 @@ def sync_integration(
 
     if sync_github:
         logger.info(f"Syncing from GitHub API for {integration}")
-        github_result = sync_from_github_api(integration, since)
+        github_result = sync_from_github_api(integration, since, full_sync=full_sync)
         results["github"] = {
             "commits_created": github_result.commits_created,
             "commits_skipped": github_result.commits_skipped,
