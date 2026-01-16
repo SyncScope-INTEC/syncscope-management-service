@@ -23,6 +23,7 @@ def team(db):
     return Team.objects.create(
         name="Test Team",
         company_id=uuid.uuid4(),
+        created_by=uuid.uuid4(),
     )
 
 
