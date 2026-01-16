@@ -308,6 +308,89 @@ class TestSyncFromGitHubApi:
         assert "No access token" in result.errors[0]
 
     @patch("apps.management.sync_service.requests.get")
+    def test_sync_from_github_other_error(self, mock_get, github_integration):
+        """Test sync handles other GitHub API errors."""
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
+        mock_get.return_value = mock_response
+
+        result = sync_from_github_api(github_integration)
+
+        assert result.commits_created == 0
+        assert len(result.errors) == 1
+        assert "500" in result.errors[0]
+
+    @patch("apps.management.sync_service.requests.get")
+    def test_sync_from_github_connection_error(self, mock_get, github_integration):
+        """Test sync handles GitHub connection errors."""
+        import requests
+
+        mock_get.side_effect = requests.RequestException("Connection failed")
+
+        result = sync_from_github_api(github_integration)
+
+        assert result.commits_created == 0
+        assert len(result.errors) == 1
+        assert "Connection failed" in result.errors[0]
+
+    @patch("apps.management.sync_service.requests.get")
+    def test_sync_from_github_missing_sha(self, mock_get, github_integration):
+        """Test sync skips commits without sha."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = [
+            {
+                "sha": None,
+                "commit": {
+                    "author": {
+                        "name": "Test Author",
+                        "email": "test@example.com",
+                        "date": "2026-01-15T10:00:00Z",
+                    },
+                    "message": "Test commit",
+                },
+            }
+        ]
+        mock_get.return_value = mock_response
+
+        result = sync_from_github_api(github_integration)
+
+        assert result.commits_created == 0
+        assert result.commits_skipped == 1
+
+    @patch("apps.management.sync_service.requests.get")
+    def test_sync_from_github_with_branch(self, mock_get, github_integration):
+        """Test sync uses branch parameter."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = []
+        mock_get.return_value = mock_response
+
+        sync_from_github_api(github_integration, branch="feature-branch")
+
+        # Verify branch was passed as sha parameter
+        call_args = mock_get.call_args
+        assert call_args[1]["params"]["sha"] == "feature-branch"
+
+    @patch("apps.management.sync_service.requests.get")
+    def test_sync_from_github_uses_last_sync(self, mock_get, github_integration):
+        """Test sync uses last_sync timestamp."""
+        github_integration.last_sync = timezone.now() - timedelta(hours=1)
+        github_integration.save()
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = []
+        mock_get.return_value = mock_response
+
+        sync_from_github_api(github_integration)
+
+        # Verify since parameter was passed
+        call_args = mock_get.call_args
+        assert "since" in call_args[1]["params"]
+
+    @patch("apps.management.sync_service.requests.get")
     def test_sync_from_github_duplicate_commit(self, mock_get, github_integration):
         """Test sync skips existing commits from GitHub."""
         # Create existing commit
