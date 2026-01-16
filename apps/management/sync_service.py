@@ -189,8 +189,11 @@ def sync_from_github_api(
         params["sha"] = branch
 
     try:
-        # Paginate through all commits
+        # Paginate through commits - limit pages to prevent timeout
         page = 1
+        max_pages = 3 if full_sync else 10  # Limit pages for full sync to prevent timeout
+        commits_to_create = []
+
         while True:
             params["page"] = page
             response = requests.get(api_url, headers=headers, params=params, timeout=30)
@@ -220,6 +223,14 @@ def sync_from_github_api(
 
             logger.info(f"Fetched {len(commits)} commits from GitHub API (page {page})")
 
+            # Get existing commit hashes in bulk for efficiency
+            existing_hashes = set(
+                CodeCommit.objects.filter(
+                    project=project,
+                    commit_hash__in=[c.get("sha") for c in commits if c.get("sha")]
+                ).values_list("commit_hash", flat=True)
+            )
+
             for commit_data in commits:
                 try:
                     commit_hash = commit_data.get("sha")
@@ -228,7 +239,7 @@ def sync_from_github_api(
                         continue
 
                     # Check if commit already exists
-                    if CodeCommit.objects.filter(project=project, commit_hash=commit_hash).exists():
+                    if commit_hash in existing_hashes:
                         result.commits_skipped += 1
                         continue
 
@@ -244,8 +255,8 @@ def sync_from_github_api(
                     else:
                         timestamp = timezone.now()
 
-                    # Create CodeCommit record
-                    CodeCommit.objects.create(
+                    # Prepare CodeCommit object for bulk creation
+                    commits_to_create.append(CodeCommit(
                         project=project,
                         commit_hash=commit_hash,
                         author_email=author_info.get("email") or "unknown@example.com",
@@ -256,25 +267,31 @@ def sync_from_github_api(
                         files_changed=len(commit_data.get("files", [])) if "files" in commit_data else 0,
                         insertions=stats.get("additions", 0),
                         deletions=stats.get("deletions", 0),
-                    )
-                    result.commits_created += 1
+                    ))
 
-                except IntegrityError:
-                    # Commit already exists (race condition)
-                    result.commits_skipped += 1
                 except Exception as e:
-                    result.errors.append(f"Error creating commit {commit_data.get('sha', 'unknown')}: {str(e)}")
-                    logger.error(f"Error creating CodeCommit from GitHub: {e}")
+                    result.errors.append(f"Error preparing commit {commit_data.get('sha', 'unknown')}: {str(e)}")
+                    logger.error(f"Error preparing CodeCommit from GitHub: {e}")
 
             # Check if there are more pages
             if len(commits) < 100:
                 break
             page += 1
 
-            # Safety limit to prevent infinite loops
-            if page > 10:
-                logger.warning("Reached maximum page limit for GitHub API pagination")
+            # Safety limit to prevent timeout
+            if page > max_pages:
+                logger.warning(f"Reached maximum page limit ({max_pages}) for GitHub API pagination")
                 break
+
+        # Bulk create all commits at once for better performance
+        if commits_to_create:
+            try:
+                created = CodeCommit.objects.bulk_create(commits_to_create, ignore_conflicts=True)
+                result.commits_created = len(created)
+                logger.info(f"Bulk created {len(created)} commits from GitHub API")
+            except Exception as e:
+                result.errors.append(f"Error bulk creating commits: {str(e)}")
+                logger.error(f"Error bulk creating commits: {e}")
 
     except requests.RequestException as e:
         result.errors.append(f"Failed to connect to GitHub API: {str(e)}")
