@@ -210,6 +210,36 @@ class TestProjectAdmin:
         # Check that error messages were collected
         mock_sync.assert_called_once()
 
+    @patch("apps.management.sync_service.sync_all_project_integrations")
+    def test_project_admin_full_sync_action(self, mock_sync, project, rf):
+        """Test full_sync_all_commits admin action passes full_sync=True."""
+        from django.contrib.admin.sites import AdminSite
+        from django.contrib.messages.storage.fallback import FallbackStorage
+
+        mock_sync.return_value = [
+            {
+                "total_created": 10,
+                "total_skipped": 5,
+                "total_errors": 0,
+                "monitoring": {"errors": []},
+                "github": {"errors": []},
+            }
+        ]
+
+        admin_site = AdminSite()
+        admin = ProjectAdmin(Project, admin_site)
+
+        request = rf.post("/admin/management/project/")
+        request.user = Mock()
+        setattr(request, "session", "session")
+        messages = FallbackStorage(request)
+        setattr(request, "_messages", messages)
+
+        admin.full_sync_all_commits(request, Project.objects.filter(id=project.id))
+
+        # Verify full_sync=True was passed
+        mock_sync.assert_called_once_with(project, full_sync=True)
+
 
 @pytest.mark.django_db
 class TestTeamMemberAdmin:
@@ -307,6 +337,33 @@ class TestGitHubIntegrationAdmin:
 
         assert "repository_url" in admin.readonly_fields
         assert "last_sync" in admin.readonly_fields
+
+    @patch("apps.management.sync_service.sync_integration")
+    def test_github_integration_admin_full_sync_action(self, mock_sync, github_integration, rf):
+        """Test full_sync_commits admin action passes full_sync=True."""
+        from django.contrib.messages.storage.fallback import FallbackStorage
+
+        mock_sync.return_value = {
+            "total_created": 10,
+            "total_skipped": 5,
+            "total_errors": 0,
+            "monitoring": {"errors": []},
+            "github": {"errors": []},
+        }
+
+        admin_site = AdminSite()
+        admin = GitHubIntegrationAdmin(GitHubIntegration, admin_site)
+
+        request = rf.post("/admin/management/githubintegration/")
+        request.user = Mock()
+        setattr(request, "session", "session")
+        messages = FallbackStorage(request)
+        setattr(request, "_messages", messages)
+
+        admin.full_sync_commits(request, GitHubIntegration.objects.filter(id=github_integration.id))
+
+        # Verify full_sync=True was passed
+        mock_sync.assert_called_once_with(github_integration, full_sync=True)
 
 
 @pytest.mark.django_db

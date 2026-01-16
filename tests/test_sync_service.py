@@ -225,6 +225,23 @@ class TestSyncFromMonitoringService:
         call_args = mock_get.call_args
         assert "since" in call_args[1]["params"]
 
+    @patch("apps.management.sync_service.requests.get")
+    def test_sync_from_monitoring_full_sync_ignores_last_sync(self, mock_get, github_integration):
+        """Test full_sync ignores last_sync timestamp."""
+        github_integration.last_sync = timezone.now() - timedelta(hours=1)
+        github_integration.save()
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"git_events": [], "count": 0}
+        mock_get.return_value = mock_response
+
+        sync_from_monitoring_service(github_integration, full_sync=True)
+
+        # Verify the since parameter was NOT passed when full_sync=True
+        call_args = mock_get.call_args
+        assert "since" not in call_args[1]["params"] or call_args[1]["params"].get("since") is None
+
 
 @pytest.mark.django_db
 class TestSyncFromGitHubApi:
@@ -391,6 +408,23 @@ class TestSyncFromGitHubApi:
         assert "since" in call_args[1]["params"]
 
     @patch("apps.management.sync_service.requests.get")
+    def test_sync_from_github_full_sync_ignores_last_sync(self, mock_get, github_integration):
+        """Test full_sync ignores last_sync timestamp."""
+        github_integration.last_sync = timezone.now() - timedelta(hours=1)
+        github_integration.save()
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = []
+        mock_get.return_value = mock_response
+
+        sync_from_github_api(github_integration, full_sync=True)
+
+        # Verify since parameter was NOT passed when full_sync=True
+        call_args = mock_get.call_args
+        assert "since" not in call_args[1]["params"]
+
+    @patch("apps.management.sync_service.requests.get")
     def test_sync_from_github_duplicate_commit(self, mock_get, github_integration):
         """Test sync skips existing commits from GitHub."""
         # Create existing commit
@@ -496,6 +530,37 @@ class TestSyncIntegration:
         github_integration.refresh_from_db()
         assert github_integration.last_sync is not None
         assert github_integration.last_sync != original_last_sync
+
+    @patch("apps.management.sync_service.requests.get")
+    def test_sync_integration_full_sync_passes_flag(self, mock_get, github_integration):
+        """Test full_sync flag is passed to sync functions."""
+        github_integration.last_sync = timezone.now() - timedelta(hours=1)
+        github_integration.save()
+
+        # First call for monitoring, second for GitHub
+        mock_monitoring_response = Mock()
+        mock_monitoring_response.status_code = 200
+        mock_monitoring_response.json.return_value = {"git_events": [], "count": 0}
+
+        mock_github_response = Mock()
+        mock_github_response.status_code = 200
+        mock_github_response.json.return_value = []
+
+        def side_effect(url, **kwargs):
+            if "github.com" in url:
+                return mock_github_response
+            return mock_monitoring_response
+
+        mock_get.side_effect = side_effect
+
+        sync_integration(github_integration, full_sync=True)
+
+        # When full_sync=True, the since parameter should not be used
+        # Check the calls to verify since was not included
+        for call in mock_get.call_args_list:
+            params = call[1].get("params", {})
+            # Since should not be in params when full_sync=True
+            assert "since" not in params or params.get("since") is None
 
 
 @pytest.mark.django_db
