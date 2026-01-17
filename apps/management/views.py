@@ -214,9 +214,12 @@ class TeamViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         return TeamSerializer
 
     @atomic_with_retry()
-    def perform_create(self, serializer):
-        """Create team with user context."""
-        user = self.request.user
+    def create(self, request, *args, **kwargs):
+        """Create team with user context and return full team data including ID."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
 
         # Create Team instance
         team_data = {
@@ -231,6 +234,10 @@ class TeamViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         # Auto-add creator as team lead
         if hasattr(user, "id"):
             TeamMember.objects.create(team=team, user_id=user.id, role="lead")
+
+        # Return full team data including ID
+        response_serializer = TeamSerializer(team)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
         tags=["Teams"],
