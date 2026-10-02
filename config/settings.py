@@ -247,6 +247,10 @@ MONITORING_SERVICE_URL = config("MONITORING_SERVICE_URL", default="http://localh
 ANALYTICS_SERVICE_URL = config("ANALYTICS_SERVICE_URL", default="http://localhost:8003")
 ALERTS_SERVICE_URL = config("ALERTS_SERVICE_URL", default="http://localhost:8004")
 
+# GitHub OAuth settings
+GITHUB_CLIENT_ID = config("GH_CLIENT_ID", default="")
+GITHUB_CLIENT_SECRET = config("GH_CLIENT_SECRET", default="")
+
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True

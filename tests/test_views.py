@@ -1,6 +1,6 @@
 import json
 import uuid
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from django.urls import reverse
@@ -12,6 +12,8 @@ from apps.management.models import (
     Integration,
     OrganizationSettings,
     Project,
+    ProjectInvitation,
+    ProjectMember,
     Team,
     TeamMember,
 )
@@ -122,6 +124,27 @@ class TestTeamViewSet:
 
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) >= 1
+
+    def test_filter_teams_by_project(self, authenticated_client, team_with_lead, project, mock_auth_service):
+        """Test filtering teams by project ID."""
+        team, lead = team_with_lead
+        # Update project to belong to this team
+        project.team = team
+        project.save()
+
+        # Create another team without this project
+        other_team = Team.objects.create(name="Other Team", company_id=team.company_id, created_by=team.created_by)
+
+        url = reverse("management:team-list")
+        response = authenticated_client.get(url, {"project": str(project.id)})
+
+        assert response.status_code == status.HTTP_200_OK
+        results = response.data.get("results", response.data)
+        # Should only return the team that has this project
+        assert len(results) >= 1
+        assert any(str(t["id"]) == str(team.id) for t in results)
+        # Should not include the other team
+        assert not any(str(t["id"]) == str(other_team.id) for t in results)
 
 
 @pytest.mark.django_db
@@ -235,6 +258,100 @@ class TestProjectViewSet:
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) >= 1
 
+    def test_filter_projects_by_company(self, authenticated_client, team_with_lead, mock_auth_service, mock_user_data):
+        """Test filtering projects by company ID."""
+        from apps.management.models import ProjectMember
+
+        team, lead = team_with_lead
+
+        # Create a project in this team's company
+        project1 = Project.objects.create(name="Company Project", team=team)
+
+        # Make authenticated user a member of this project
+        TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
+        ProjectMember.objects.create(project=project1, user_id=mock_user_data["user_id"], role="contributor")
+
+        # Create another team in a different company
+        other_company_id = uuid.uuid4()
+        other_team = Team.objects.create(name="Other Company Team", company_id=other_company_id, created_by=team.created_by)
+        project2 = Project.objects.create(name="Other Company Project", team=other_team)
+
+        url = reverse("management:project-list")
+        response = authenticated_client.get(url, {"company": str(team.company_id)})
+
+        assert response.status_code == status.HTTP_200_OK
+        results = response.data.get("results", response.data)
+        # Should only return projects from the specified company
+        if isinstance(results, list):
+            project_ids = [str(p["id"]) for p in results]
+            assert str(project1.id) in project_ids
+            # Should not include projects from other companies
+            assert str(project2.id) not in project_ids
+
+    def test_filter_projects_by_user(self, authenticated_client, team_with_lead, mock_auth_service, mock_user_data):
+        """Test filtering projects by user ID."""
+        from apps.management.models import ProjectMember
+
+        team, lead = team_with_lead
+
+        # Create two projects
+        project1 = Project.objects.create(name="User Project", team=team)
+        project2 = Project.objects.create(name="Other Project", team=team)
+
+        # Make authenticated user a team member
+        TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
+
+        # Add user to only project1
+        ProjectMember.objects.create(project=project1, user_id=mock_user_data["user_id"], role="contributor")
+
+        # Add different user to project2 (must be team member first)
+        other_user_id = uuid.uuid4()
+        TeamMember.objects.create(team=team, user_id=other_user_id, role="developer")
+        ProjectMember.objects.create(project=project2, user_id=other_user_id, role="contributor")
+
+        url = reverse("management:project-list")
+        response = authenticated_client.get(url, {"user": str(mock_user_data["user_id"])})
+
+        assert response.status_code == status.HTTP_200_OK
+        results = response.data.get("results", response.data)
+        # Should only return projects where the user is a member
+        if isinstance(results, list):
+            project_ids = [str(p["id"]) for p in results]
+            assert str(project1.id) in project_ids
+
+    def test_filter_projects_by_company_and_user(
+        self, authenticated_client, team_with_lead, mock_auth_service, mock_user_data
+    ):
+        """Test filtering projects by both company and user ID."""
+        from apps.management.models import ProjectMember
+
+        team, lead = team_with_lead
+
+        # Create project in this company with user as member
+        project1 = Project.objects.create(name="Company User Project", team=team)
+
+        # Make authenticated user a team member
+        TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
+        ProjectMember.objects.create(project=project1, user_id=mock_user_data["user_id"], role="contributor")
+
+        # Create another project in same company with different user (must be team member first)
+        project2 = Project.objects.create(name="Company Other Project", team=team)
+        other_user_id = uuid.uuid4()
+        TeamMember.objects.create(team=team, user_id=other_user_id, role="developer")
+        ProjectMember.objects.create(project=project2, user_id=other_user_id, role="contributor")
+
+        url = reverse("management:project-list")
+        response = authenticated_client.get(url, {"company": str(team.company_id), "user": str(mock_user_data["user_id"])})
+
+        assert response.status_code == status.HTTP_200_OK
+        results = response.data.get("results", response.data)
+        # Should only return projects matching both filters
+        if isinstance(results, list):
+            project_ids = [str(p["id"]) for p in results]
+            assert str(project1.id) in project_ids
+            # Should not include project2 (different user)
+            assert str(project2.id) not in project_ids
+
 
 @pytest.mark.django_db
 class TestTeamMemberViewSet:
@@ -289,6 +406,37 @@ class TestTeamMemberViewSet:
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not TeamMember.objects.filter(id=team_member.id).exists()
+
+    def test_filter_team_members_by_project(self, authenticated_client, team_with_lead, mock_auth_service, mock_user_data):
+        """Test filtering team members by project ID."""
+        team, lead = team_with_lead
+
+        # Create a project for this team
+        project = Project.objects.create(name="Test Project", team=team)
+
+        # Create another team without this project
+        other_team = Team.objects.create(name="Other Team", company_id=team.company_id, created_by=team.created_by)
+        other_member = TeamMember.objects.create(team=other_team, user_id=uuid.uuid4(), role="developer")
+
+        # Make authenticated user a member of both teams
+        TeamMember.objects.get_or_create(team=team, user_id=mock_user_data["user_id"], defaults={"role": "developer"})
+        TeamMember.objects.get_or_create(
+            team=other_team,
+            user_id=mock_user_data["user_id"],
+            defaults={"role": "developer"},
+        )
+
+        url = reverse("management:teammember-list")
+        response = authenticated_client.get(url, {"project": str(project.id)})
+
+        assert response.status_code == status.HTTP_200_OK
+        results = response.data.get("results", response.data)
+        # Should only return members from the team that has this project
+        if isinstance(results, list):
+            member_ids = [m["id"] for m in results]
+            assert str(lead.id) in member_ids
+            # Should not include members from other teams
+            assert str(other_member.id) not in member_ids
 
 
 @pytest.mark.django_db
@@ -409,8 +557,10 @@ class TestGitHubIntegrationViewSet:
         assert response.data["repository_name"] == github_integration.repository_name
         assert "repository_url" in response.data
 
+    @patch("apps.management.sync_service.requests.get")
     def test_github_integration_sync(
         self,
+        mock_requests_get,
         authenticated_client,
         github_integration,
         team_with_lead,
@@ -421,12 +571,31 @@ class TestGitHubIntegrationViewSet:
         github_integration.project.team = team
         github_integration.project.save()
 
+        # Mock the monitoring service response (no git events)
+        mock_monitoring_response = Mock()
+        mock_monitoring_response.status_code = 200
+        mock_monitoring_response.json.return_value = {"git_events": [], "count": 0}
+
+        # Mock the GitHub API response (no commits)
+        mock_github_response = Mock()
+        mock_github_response.status_code = 200
+        mock_github_response.json.return_value = []
+
+        # Configure mock to return different responses based on URL
+        def side_effect(url, **kwargs):
+            if "github.com" in url:
+                return mock_github_response
+            return mock_monitoring_response
+
+        mock_requests_get.side_effect = side_effect
+
         url = reverse("management:githubintegration-sync", args=[github_integration.id])
 
         response = authenticated_client.post(url)
 
         assert response.status_code == status.HTTP_200_OK
-        assert "sync triggered successfully" in response.data["message"].lower()
+        assert "sync completed successfully" in response.data["message"].lower()
+        assert "results" in response.data
 
 
 @pytest.mark.django_db
@@ -1357,3 +1526,153 @@ class TestOrganizationSettingsViewSet:
         assert response.status_code == status.HTTP_200_OK
         settings.refresh_from_db()
         assert settings.failed_deletion_attempts == 0
+
+
+@pytest.mark.django_db
+class TestProjectInvitationView:
+    """Tests for project invitation creation and listing endpoints."""
+
+    def test_create_invitation_as_admin(self, admin_authenticated_client, project, mock_admin_user_data, mock_auth_service):
+        """Test admin can create project invitations."""
+        url = reverse("management:project_invitations")
+        data = {
+            "project_id": str(project.id),
+            "invitee_email": "newuser@example.com",
+            "role": "developer",
+        }
+
+        with patch("apps.management.views.send_project_invitation_email") as mock_email:
+            mock_email.return_value = True
+            response = admin_authenticated_client.post(url, data, format="json")
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert "invitation_id" in response.data
+        assert response.data["invitee_email"] == "newuser@example.com"
+        assert ProjectInvitation.objects.filter(invitee_email="newuser@example.com").exists()
+
+    def test_create_invitation_as_supervisor(self, authenticated_client, project, base_user_data, mock_auth_service):
+        """Test supervisor can create project invitations."""
+        # Mock user as supervisor
+        mock_post, mock_get = mock_auth_service
+        supervisor_data = base_user_data.copy()
+        supervisor_data["role"] = "supervisor"
+        mock_post.return_value.json.return_value = {"valid": True, **supervisor_data}
+
+        url = reverse("management:project_invitations")
+        data = {
+            "project_id": str(project.id),
+            "invitee_email": "newuser@example.com",
+            "role": "supervisor",
+        }
+
+        with patch("apps.management.views.send_project_invitation_email") as mock_email:
+            mock_email.return_value = True
+            response = authenticated_client.post(url, data, format="json")
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert ProjectInvitation.objects.filter(invitee_email="newuser@example.com", role="supervisor").exists()
+
+    def test_create_invitation_as_developer_forbidden(self, authenticated_client, project, mock_auth_service):
+        """Test developer cannot create project invitations."""
+        url = reverse("management:project_invitations")
+        data = {
+            "project_id": str(project.id),
+            "invitee_email": "newuser@example.com",
+            "role": "developer",
+        }
+
+        response = authenticated_client.post(url, data, format="json")
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_list_invitations_admin(self, admin_authenticated_client, project, mock_admin_user_data, mock_auth_service):
+        """Test admin can list all invitations."""
+        # Create test invitations
+        ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=mock_admin_user_data["user_id"],
+            invitee_email="user1@example.com",
+            role="developer",
+        )
+
+        url = reverse("management:project_invitations")
+        response = admin_authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data) >= 1
+
+    def test_list_invitations_unauthenticated(self, api_client):
+        """Test unauthenticated users cannot list invitations."""
+        url = reverse("management:project_invitations")
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.django_db
+class TestAcceptProjectInvitationView:
+    """Tests for project invitation acceptance endpoints."""
+
+    def test_accept_invitation_success(self, authenticated_client, project, team, mock_user_data, mock_auth_service):
+        """Test successful invitation acceptance."""
+        # Create invitation
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=uuid.uuid4(),
+            invitee_email="invitee@example.com",
+            role="developer",
+        )
+
+        url = reverse("management:accept_project_invitation")
+        data = {"token": invitation.token}
+
+        response = authenticated_client.post(url, data, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert "Welcome to" in response.data["message"]
+        assert response.data["role"] == "developer"
+
+        # Verify invitation was accepted
+        invitation.refresh_from_db()
+        assert invitation.is_accepted is True
+
+    def test_accept_invitation_invalid_token(self, authenticated_client, mock_auth_service):
+        """Test accepting invitation with invalid token."""
+        url = reverse("management:accept_project_invitation")
+        data = {"token": "invalid-token-12345"}
+
+        response = authenticated_client.post(url, data, format="json")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_validate_invitation_token(self, authenticated_client, project, mock_auth_service):
+        """Test validating invitation token without accepting."""
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=uuid.uuid4(),
+            invitee_email="invitee@example.com",
+            role="supervisor",
+        )
+
+        url = reverse("management:accept_project_invitation") + f"?token={invitation.token}"
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["role"] == "supervisor"
+
+        # Verify invitation was NOT accepted
+        invitation.refresh_from_db()
+        assert invitation.is_accepted is False
+
+    def test_accept_invitation_unauthenticated(self, api_client, project):
+        """Test unauthenticated users cannot accept invitations."""
+        invitation = ProjectInvitation.objects.create(
+            project=project,
+            inviter_id=uuid.uuid4(),
+            invitee_email="invitee@example.com",
+            role="developer",
+        )
+
+        url = reverse("management:accept_project_invitation")
+        data = {"token": invitation.token}
+
+        response = api_client.post(url, data, format="json")
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED

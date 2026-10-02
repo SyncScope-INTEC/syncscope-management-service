@@ -9,6 +9,7 @@ from .models import (
     Integration,
     OrganizationSettings,
     Project,
+    ProjectInvitation,
     ProjectMember,
     Team,
     TeamMember,
@@ -523,6 +524,7 @@ class OrganizationSettingsSerializer(serializers.ModelSerializer):
             "company_id",
             "company_name",
             "deletion_protection_enabled",
+            "deletion_password_hash",  # Include for authenticated users (agent needs this for offline mode)
             "deletion_password_updated_at",
             "failed_deletion_attempts",
             "last_failed_attempt_at",
@@ -533,6 +535,7 @@ class OrganizationSettingsSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "deletion_password_hash",  # Read-only, set via set_deletion_password() method
             "deletion_password_updated_at",
             "failed_deletion_attempts",
             "last_failed_attempt_at",
@@ -541,11 +544,21 @@ class OrganizationSettingsSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
-    # Exclude the password hash from serialization for security
     def to_representation(self, instance):
+        """
+        Customize representation to conditionally include password hash.
+
+        The password hash is only included for authenticated users so that
+        the agent can cache it locally for offline deletion protection verification.
+        """
         data = super().to_representation(instance)
-        # Never expose the password hash
-        data.pop("deletion_password_hash", None)
+
+        # Only include password hash for authenticated requests
+        # For unauthenticated or non-existent requests, remove the hash
+        request = self.context.get("request")
+        if not request or not request.user or not request.user.is_authenticated:
+            data.pop("deletion_password_hash", None)
+
         return data
 
 
@@ -625,3 +638,129 @@ class ErrorResponseSerializer(serializers.Serializer):
 
     error = serializers.CharField()
     details = serializers.DictField(required=False)
+
+
+# ==================== Project Invitation Serializers ====================
+
+
+class ProjectInvitationSerializer(serializers.ModelSerializer):
+    """Serializer for listing project invitations."""
+
+    project_name = serializers.CharField(source="project.name", read_only=True)
+    team_name = serializers.CharField(source="project.team.name", read_only=True)
+    is_expired = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectInvitation
+        fields = [
+            "id",
+            "project",
+            "project_name",
+            "team_name",
+            "inviter_id",
+            "invitee_email",
+            "role",
+            "token",
+            "created_at",
+            "expires_at",
+            "is_accepted",
+            "accepted_at",
+            "accepted_by_id",
+            "auto_added_to_team",
+            "is_expired",
+        ]
+        read_only_fields = [
+            "id",
+            "token",
+            "created_at",
+            "expires_at",
+            "is_accepted",
+            "accepted_at",
+            "accepted_by_id",
+            "auto_added_to_team",
+        ]
+
+    def get_is_expired(self, obj):
+        """Check if invitation has expired."""
+        from django.utils import timezone
+
+        return obj.expires_at <= timezone.now()
+
+
+class CreateProjectInvitationSerializer(serializers.Serializer):
+    """Serializer for creating project invitations."""
+
+    project_id = serializers.UUIDField(required=True)
+    invitee_email = serializers.EmailField(required=True)
+    role = serializers.ChoiceField(choices=[("supervisor", "Supervisor"), ("developer", "Developer")], default="developer")
+
+    def validate_invitee_email(self, value):
+        """Validate email format."""
+        from django.core.validators import EmailValidator, ValidationError
+
+        validator = EmailValidator()
+        try:
+            validator(value)
+        except ValidationError:
+            raise serializers.ValidationError("Invalid email address")
+        return value.lower()
+
+    def validate_project_id(self, value):
+        """Validate project exists."""
+        try:
+            project = Project.objects.get(id=value)
+            self.context["project"] = project
+            return value
+        except Project.DoesNotExist:
+            raise serializers.ValidationError("Project not found")
+
+    def validate(self, data):
+        """Cross-field validation."""
+        from django.utils import timezone
+
+        project = self.context.get("project")
+        invitee_email = data["invitee_email"]
+
+        # Check if user already has an active invitation
+        active_invitation = ProjectInvitation.objects.filter(
+            project=project, invitee_email=invitee_email, is_accepted=False, expires_at__gt=timezone.now()
+        ).first()
+
+        if active_invitation:
+            raise serializers.ValidationError(f"An active invitation already exists for {invitee_email}")
+
+        return data
+
+
+class InviteProjectUserResponseSerializer(serializers.Serializer):
+    """Response serializer for project invitation creation."""
+
+    message = serializers.CharField()
+    invitation_id = serializers.UUIDField()
+    invitee_email = serializers.EmailField()
+    project_name = serializers.CharField()
+
+
+class AcceptProjectInvitationSerializer(serializers.Serializer):
+    """Serializer for accepting project invitations."""
+
+    token = serializers.CharField(required=True)
+
+    def validate_token(self, value):
+        """Validate invitation token."""
+        invitation = ProjectInvitation.get_active_invitation(value)
+        if not invitation:
+            raise serializers.ValidationError("Invalid or expired invitation token")
+
+        self.context["invitation"] = invitation
+        return value
+
+
+class AcceptProjectInvitationResponseSerializer(serializers.Serializer):
+    """Response serializer for accepting project invitation."""
+
+    message = serializers.CharField()
+    project_name = serializers.CharField()
+    team_name = serializers.CharField()
+    role = serializers.CharField()
+    auto_added_to_team = serializers.BooleanField()

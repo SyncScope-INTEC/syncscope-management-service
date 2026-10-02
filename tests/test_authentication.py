@@ -256,7 +256,7 @@ class TestAuthServiceIntegration:
         # Verify correct API call
         mock_get.assert_called_once()
         args, kwargs = mock_get.call_args
-        assert "profile" in args[0]
+        assert f"users/{user_id}" in args[0]
         assert kwargs["headers"]["Authorization"] == "Bearer test-token"
 
     @patch("apps.management.authentication.requests.get")

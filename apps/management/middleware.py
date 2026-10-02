@@ -52,10 +52,10 @@ class RateLimitMiddleware(MiddlewareMixin):
 
         # Different rate limits for different endpoints
         if request.path.startswith("/auth/login") or request.path.startswith("/auth/register"):
-            limit = 5  # 5 requests per minute for login/register
+            limit = 50  # 50 requests per minute for login/register
             window = 60
         elif request.path.startswith("/auth/"):
-            limit = 30  # 30 requests per minute for other auth endpoints
+            limit = 50  # 50 requests per minute for other auth endpoints
             window = 60
         else:
             return None

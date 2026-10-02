@@ -8,10 +8,11 @@ from django.template import loader
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from config.database_retry import atomic_with_retry
 
@@ -23,21 +24,27 @@ from .models import (
     Integration,
     OrganizationSettings,
     Project,
+    ProjectInvitation,
     ProjectMember,
     Team,
     TeamMember,
 )
 from .permissions import IsOwnerOrAdmin, IsProjectMemberOrAdmin, IsTeamMemberOrAdmin
 from .serializers import (
+    AcceptProjectInvitationResponseSerializer,
+    AcceptProjectInvitationSerializer,
     CodeCommitSerializer,
+    CreateProjectInvitationSerializer,
     ErrorResponseSerializer,
     GitHubIntegrationSerializer,
     IntegrationCreateSerializer,
     IntegrationSerializer,
+    InviteProjectUserResponseSerializer,
     OrganizationSettingsSerializer,
     OrganizationSettingsUpdateSerializer,
     ProjectCreateSerializer,
     ProjectDetailSerializer,
+    ProjectInvitationSerializer,
     ProjectMemberCreateSerializer,
     ProjectMemberSerializer,
     ProjectSerializer,
@@ -50,6 +57,7 @@ from .serializers import (
     VerifyDeletionPasswordResponseSerializer,
     VerifyDeletionPasswordSerializer,
 )
+from .utils import send_project_invitation_email
 
 
 @api_view(["GET"])
@@ -131,7 +139,16 @@ def api_home(request):
     list=extend_schema(
         tags=["Teams"],
         summary="List teams",
-        description="Get a list of teams for the authenticated user's company.",
+        description="Get a list of teams for the authenticated user's company. Supports filtering by project.",
+        parameters=[
+            OpenApiParameter(
+                name="project",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter teams by project ID (UUID)",
+                required=False,
+            ),
+        ],
     ),
     create=extend_schema(
         tags=["Teams"],
@@ -172,12 +189,19 @@ class TeamViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         """Filter teams by user's company."""
         user = self.request.user
         if hasattr(user, "role") and user.role == "admin":
-            return Team.objects.all()
+            queryset = Team.objects.all()
+        elif hasattr(user, "company_id") and user.company_id:
+            queryset = Team.objects.filter(company_id=user.company_id)
+        else:
+            queryset = Team.objects.none()
 
-        if hasattr(user, "company_id") and user.company_id:
-            return Team.objects.filter(company_id=user.company_id)
+        # Apply query parameter filters
+        # Filter by project
+        project_id = self.request.query_params.get("project")
+        if project_id:
+            queryset = queryset.filter(projects__id=project_id).distinct()
 
-        return Team.objects.none()
+        return queryset
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action."""
@@ -190,9 +214,12 @@ class TeamViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         return TeamSerializer
 
     @atomic_with_retry()
-    def perform_create(self, serializer):
-        """Create team with user context."""
-        user = self.request.user
+    def create(self, request, *args, **kwargs):
+        """Create team with user context and return full team data including ID."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
 
         # Create Team instance
         team_data = {
@@ -207,6 +234,10 @@ class TeamViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         # Auto-add creator as team lead
         if hasattr(user, "id"):
             TeamMember.objects.create(team=team, user_id=user.id, role="lead")
+
+        # Return full team data including ID
+        response_serializer = TeamSerializer(team)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
         tags=["Teams"],
@@ -274,7 +305,23 @@ class TeamViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
     list=extend_schema(
         tags=["Projects"],
         summary="List projects",
-        description="Get a list of projects the user has access to.",
+        description="Get a list of projects the user has access to. Supports filtering by company and user.",
+        parameters=[
+            OpenApiParameter(
+                name="company",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter projects by company ID (UUID)",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="user",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter projects by user ID (UUID) - shows projects where user is a member",
+                required=False,
+            ),
+        ],
     ),
     create=extend_schema(
         tags=["Projects"],
@@ -314,14 +361,26 @@ class ProjectViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         user = self.request.user
 
         if hasattr(user, "role") and user.role == "admin":
-            return Project.objects.all()
-
-        if hasattr(user, "id"):
+            queryset = Project.objects.all()
+        elif hasattr(user, "id"):
             # Get projects from teams user is a member of
             user_teams = TeamMember.objects.filter(user_id=user.id).values_list("team", flat=True)
-            return Project.objects.filter(team__in=user_teams)
+            queryset = Project.objects.filter(team__in=user_teams)
+        else:
+            return Project.objects.none()
 
-        return Project.objects.none()
+        # Apply query parameter filters
+        # Filter by company (via team.company_id)
+        company_id = self.request.query_params.get("company")
+        if company_id:
+            queryset = queryset.filter(team__company_id=company_id)
+
+        # Filter by user (projects where user is a member)
+        user_id = self.request.query_params.get("user")
+        if user_id:
+            queryset = queryset.filter(members__user_id=user_id).distinct()
+
+        return queryset
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action."""
@@ -474,7 +533,16 @@ class ProjectViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
     list=extend_schema(
         tags=["Team Members"],
         summary="List team members",
-        description="Get a list of all team members the user has access to.",
+        description="Get a list of all team members the user has access to. Supports filtering by project.",
+        parameters=[
+            OpenApiParameter(
+                name="project",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter team members by project ID (UUID) - shows members of teams that have this project",
+                required=False,
+            ),
+        ],
     ),
     create=extend_schema(
         tags=["Team Members"],
@@ -514,14 +582,21 @@ class TeamMemberViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
         user = self.request.user
 
         if hasattr(user, "role") and user.role == "admin":
-            return TeamMember.objects.all()
-
-        if hasattr(user, "id"):
+            queryset = TeamMember.objects.all()
+        elif hasattr(user, "id"):
             # Get members from teams user is a member of
             user_teams = TeamMember.objects.filter(user_id=user.id).values_list("team", flat=True)
-            return TeamMember.objects.filter(team__in=user_teams)
+            queryset = TeamMember.objects.filter(team__in=user_teams)
+        else:
+            queryset = TeamMember.objects.none()
 
-        return TeamMember.objects.none()
+        # Apply query parameter filters
+        # Filter by project (team members whose team has this project)
+        project_id = self.request.query_params.get("project")
+        if project_id:
+            queryset = queryset.filter(team__projects__id=project_id).distinct()
+
+        return queryset
 
 
 @extend_schema_view(
@@ -696,21 +771,49 @@ class GitHubIntegrationViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
     @extend_schema(
         tags=["Integrations"],
         summary="Sync GitHub integration",
-        description="Trigger a manual sync for a GitHub integration.",
+        description="Trigger a manual sync for a GitHub integration. Fetches commits from both the monitoring service and GitHub API.",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "sync_monitoring": {"type": "boolean", "default": True, "description": "Sync from monitoring service"},
+                    "sync_github": {"type": "boolean", "default": True, "description": "Sync from GitHub API"},
+                },
+            }
+        },
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string"},
+                    "results": {"type": "object"},
+                },
+            }
+        },
     )
     @action(detail=True, methods=["post"])
     def sync(self, request, pk=None):
         """Trigger manual sync for GitHub integration."""
+        from .sync_service import sync_integration
+
         integration = self.get_object()
 
-        # TODO: Implement GitHub sync logic
-        # This would fetch latest commits, pull requests, etc.
+        # Get sync options from request body
+        sync_monitoring = request.data.get("sync_monitoring", True)
+        sync_github = request.data.get("sync_github", True)
 
-        integration.last_sync = timezone.now()
-        integration.save()
+        # Perform sync from both sources
+        results = sync_integration(
+            integration,
+            sync_monitoring=sync_monitoring,
+            sync_github=sync_github,
+        )
 
         return Response(
-            {"message": "GitHub sync triggered successfully."},
+            {
+                "message": "GitHub sync completed successfully.",
+                "results": results,
+            },
             status=status.HTTP_200_OK,
         )
 
@@ -1153,3 +1256,207 @@ class OrganizationSettingsViewSet(ServerlessViewMixin, viewsets.ModelViewSet):
 
         except Exception as e:
             logger.error(f"Error sending failed attempt alert: {e}", exc_info=True)
+
+
+# ==================== Project Invitation Views ====================
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Project Invitations"],
+        summary="Invite a user to join a project",
+        description=(
+            "Send an invitation email to a user to join a specific project. "
+            "Requires authentication. Only admins and supervisors can invite. "
+            "The invitee will receive an email with a link to accept the invitation. "
+            "If the user is not already a team member, they will be automatically added to the team."
+        ),
+        request=CreateProjectInvitationSerializer,
+        responses={
+            201: InviteProjectUserResponseSerializer,
+            400: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
+    ),
+    get=extend_schema(
+        tags=["Project Invitations"],
+        summary="List project invitations",
+        description=(
+            "Get a list of invitations. Query parameters: "
+            "- project: Filter by project ID "
+            "- sent_by_me: Show only invitations sent by current user (true/false) "
+            "- status: Filter by status (pending/accepted/expired)"
+        ),
+        responses={
+            200: ProjectInvitationSerializer(many=True),
+            401: ErrorResponseSerializer,
+        },
+    ),
+)
+class ProjectInvitationView(ServerlessViewMixin, APIView):
+    """Create and list project invitations."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @atomic_with_retry()
+    def post(self, request):
+        """Send a project invitation."""
+        user = request.user
+
+        # Check if user has admin or supervisor role
+        if not hasattr(user, "role") or user.role not in ["admin", "supervisor"]:
+            return Response(
+                {"error": "Only admins and supervisors can send project invitations"}, status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Validate input
+        serializer = CreateProjectInvitationSerializer(data=request.data, context={"request": request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        project = serializer.context["project"]
+        invitee_email = serializer.validated_data["invitee_email"]
+        role = serializer.validated_data["role"]
+
+        # Create the invitation
+        invitation = ProjectInvitation.objects.create(
+            project=project, inviter_id=user.id, invitee_email=invitee_email, role=role
+        )
+
+        # Send invitation email
+        user_name = f"{user.first_name} {user.last_name}".strip() if hasattr(user, "first_name") else str(user.email)
+        email_sent = send_project_invitation_email(
+            invitee_email=invitee_email,
+            inviter_name=user_name or str(user.email),
+            inviter_email=user.email,
+            project_name=project.name,
+            team_name=project.team.name,
+            role=role,
+            invitation_token=invitation.token,
+        )
+
+        if not email_sent:
+            # Log warning but don't fail
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to send project invitation email to {invitee_email}")
+
+        return Response(
+            {
+                "message": f"Invitation sent to {invitee_email}",
+                "invitation_id": invitation.id,
+                "invitee_email": invitee_email,
+                "project_name": project.name,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    def get(self, request):
+        """List project invitations with filtering."""
+        user = request.user
+
+        # Base queryset - show invitations for projects user can access
+        if hasattr(user, "role") and user.role == "admin":
+            queryset = ProjectInvitation.objects.all()
+        else:
+            # Get user's teams
+            user_teams = TeamMember.objects.filter(user_id=user.id).values_list("team", flat=True)
+            # Get projects from those teams
+            user_projects = Project.objects.filter(team__in=user_teams).values_list("id", flat=True)
+            queryset = ProjectInvitation.objects.filter(project__in=user_projects)
+
+        # Apply filters
+        project_id = request.query_params.get("project")
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+
+        sent_by_me = request.query_params.get("sent_by_me")
+        if sent_by_me and sent_by_me.lower() == "true":
+            queryset = queryset.filter(inviter_id=user.id)
+
+        status_filter = request.query_params.get("status")
+        if status_filter == "pending":
+            queryset = queryset.filter(is_accepted=False, expires_at__gt=timezone.now())
+        elif status_filter == "accepted":
+            queryset = queryset.filter(is_accepted=True)
+        elif status_filter == "expired":
+            queryset = queryset.filter(is_accepted=False, expires_at__lte=timezone.now())
+
+        queryset = queryset.order_by("-created_at")
+        serializer = ProjectInvitationSerializer(queryset, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    post=extend_schema(
+        tags=["Project Invitations"],
+        summary="Accept a project invitation",
+        description=(
+            "Accept a project invitation using the token from the email. "
+            "The user will be added to the project with the specified role. "
+            "If not already a team member, they will be automatically added to the team."
+        ),
+        request=AcceptProjectInvitationSerializer,
+        responses={
+            200: AcceptProjectInvitationResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
+    ),
+    get=extend_schema(
+        tags=["Project Invitations"],
+        summary="Validate invitation token",
+        description="Validate a project invitation token without accepting it. Returns invitation details if valid.",
+        responses={
+            200: ProjectInvitationSerializer,
+            400: ErrorResponseSerializer,
+        },
+    ),
+)
+class AcceptProjectInvitationView(ServerlessViewMixin, APIView):
+    """Accept or validate a project invitation."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @atomic_with_retry()
+    def post(self, request):
+        """Accept a project invitation."""
+        serializer = AcceptProjectInvitationSerializer(data=request.data, context={"request": request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        invitation = serializer.context["invitation"]
+        user = request.user
+
+        # Accept the invitation (this handles all the business logic)
+        try:
+            invitation.accept(user.id)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {
+                "message": f"Welcome to {invitation.project.name}!",
+                "project_name": invitation.project.name,
+                "team_name": invitation.project.team.name,
+                "role": invitation.role,
+                "auto_added_to_team": invitation.auto_added_to_team,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def get(self, request):
+        """Validate invitation token and return invitation details."""
+        token = request.query_params.get("token")
+        if not token:
+            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        invitation = ProjectInvitation.get_active_invitation(token)
+        if not invitation:
+            return Response({"error": "Invalid or expired invitation token"}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = ProjectInvitationSerializer(invitation)
+        return Response(serializer.data, status=status.HTTP_200_OK)
